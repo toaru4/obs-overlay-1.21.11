@@ -1,0 +1,28 @@
+# Validation — 3.0.0-beta.1+1.21.11
+
+Date: 2026-10-18 (Asia/Shanghai). Environment: Windows x64, Java 21, Gradle 9.2.0, Loom 1.14.10, Yarn 1.21.11+build.4, Fabric Loader 0.18.4, Fabric API 0.141.3+1.21.11.
+
+## Passed
+
+- `build`: production JAR, sources JAR, package boundary/ownership tests.
+- `runSmoke -PglSmoke -x downloadAssets`: Fabric loaded and transformed MinecraftClient, GameRenderer, GuiRenderer, GuiRenderState, GlCommandEncoder, Screen, VideoOptionsScreen and InGameHud.
+- Real hidden GLFW/OpenGL window: MinHook swap callback executed; overlay pixels reached the local backbuffer; separate simulated capture texture was unchanged; framebuffer bindings, viewport and tested GL capabilities were restored. This test does not start OBS.
+- GUI command routing with four synthetic producer packages: all eight HUD/GUI switches remained independent; enabled HUD commands entered the overlay queue; disabled HUD commands stayed in the captured queue; MaLiLib superclass detection and in-game screen policy passed.
+- Same smoke run with Meteor Client 1.21.11-86, MaLiLib 0.27.20, Xaero's Minimap 26.6.0 (XaeroLib 1.7.3), and Xaero's World Map 1.47.0 installed in the isolated test directory.
+- Inspected production JAR: Mixin targets remapped to intermediary Minecraft names; native DLL and both licenses present; synthetic producers and smoke entrypoints absent.
+
+Final test markers:
+
+```text
+POLICY_TEST_PASS
+MIXIN_SMOKE_PASS
+GL_SMOKE_PASS
+QUEUE_SMOKE_PASS: eight independent HUD/GUI policies, ON/OFF routing, MaLiLib superclass, extraction boundary
+BUILD SUCCESSFUL
+```
+
+## Limits
+
+The smoke process exits before the real Minecraft client/world starts. Loading third-party mixins successfully is not an end-to-end test of their live HUDs or screens. The queue policy tests use synthetic producers, not the actual HUD implementation of each mod. RusherHack was not installed or executed. Actual OBS capture ordering, private/native mod rendering, shader/renderer combinations, gameplay, resolution changes and fullscreen transitions still require manual acceptance testing.
+
+This is a HUD/GUI-focused Fabric beta. It does not implement the upstream world-object filters, auto-hide feature, legacy extension API, or NeoForge build. These limits are stated in the README and release notes.

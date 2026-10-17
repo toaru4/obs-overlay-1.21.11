@@ -1,0 +1,19 @@
+{
+  "obs_overlay.settings": "OBS Overlay settings",
+  "obs_overlay.mods": "Mod HUD / GUI",
+  "obs_overlay.vanilla": "Vanilla HUD",
+  "obs_overlay.all_screens": "All in-game screens",
+  "obs_overlay.test": "Capture test label",
+  "obs_overlay.toggle.tooltip": "ON: show locally and exclude from OBS Game Capture. OFF: render normally.",
+  "obs_overlay.ready": "Overlay active · OBS Game Capture required",
+  "obs_overlay.unavailable": "Overlay unavailable · check latest.log",
+  "obs_overlay.vanilla.debug": "Debug (F3)",
+  "obs_overlay.vanilla.chat": "Chat",
+  "obs_overlay.vanilla.player_list": "Player list (TAB)",
+  "obs_overlay.vanilla.subtitles": "Subtitles",
+  "obs_overlay.vanilla.scoreboard": "Scoreboard",
+  "obs_overlay.vanilla.actionbar": "Actionbar",
+  "obs_overlay.vanilla.title": "Title / subtitle",
+  "obs_overlay.vanilla.effects": "Status effects",
+  "obs_overlay.vanilla.main_hud": "Main HUD"
+}

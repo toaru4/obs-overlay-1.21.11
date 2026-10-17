@@ -1,0 +1,8 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "me.zziger.obsoverlay.port.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": ["GameRendererMixin", "MinecraftClientMixin", "ClientFramebufferAccessor", "GuiRenderStateMixin", "GuiRendererAccessor", "GlCommandEncoderMixin", "ScreenMixin", "VideoOptionsScreenMixin", "VanillaHudMixin"],
+  "injectors": {"defaultRequire": 1}
+}

@@ -1,0 +1,19 @@
+{
+  "obs_overlay.settings": "OBS Overlay 设置",
+  "obs_overlay.mods": "模组 HUD / 界面",
+  "obs_overlay.vanilla": "原版 HUD",
+  "obs_overlay.all_screens": "所有游戏内界面",
+  "obs_overlay.test": "录制测试标记",
+  "obs_overlay.toggle.tooltip": "开启：本地显示，OBS 游戏采集不录制。关闭：正常绘制。",
+  "obs_overlay.ready": "叠加层已启用 · 请使用 OBS 游戏采集",
+  "obs_overlay.unavailable": "叠加层不可用 · 请查看 latest.log",
+  "obs_overlay.vanilla.debug": "调试信息 (F3)",
+  "obs_overlay.vanilla.chat": "聊天记录",
+  "obs_overlay.vanilla.player_list": "玩家列表 (TAB)",
+  "obs_overlay.vanilla.subtitles": "声音字幕",
+  "obs_overlay.vanilla.scoreboard": "计分板",
+  "obs_overlay.vanilla.actionbar": "动作栏",
+  "obs_overlay.vanilla.title": "标题 / 副标题",
+  "obs_overlay.vanilla.effects": "状态效果",
+  "obs_overlay.vanilla.main_hud": "主 HUD"
+}

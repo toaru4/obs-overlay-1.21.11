@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "obs_overlay",
+  "version": "${version}",
+  "name": "OBS Overlay",
+  "description": "Local-only HUD and GUI overlays for OBS Game Capture on Windows. Minecraft 1.21.11 port.",
+  "authors": ["zziger", "toaru4"],
+  "license": "MIT",
+  "environment": "client",
+  "contact": {"sources": "https://github.com/toaru4/obs-overlay-1.21.11"},
+  "entrypoints": {
+    "client": ["me.zziger.obsoverlay.port.OBSOverlay"],
+    "modmenu": ["me.zziger.obsoverlay.port.ModMenuIntegration"]
+  },
+  "mixins": ["obs_overlay.port.mixins.json"],
+  "depends": {"fabricloader": ">=0.18.4", "minecraft": "1.21.11", "java": ">=21", "fabric-api": "*"},
+  "suggests": {"modmenu": "*"}
+}
