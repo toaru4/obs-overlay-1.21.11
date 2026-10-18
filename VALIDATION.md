@@ -1,4 +1,4 @@
-# Validation — 3.0.0-beta.1+1.21.11
+# Validation — 3.0.0-beta.2+1.21.11
 
 Date: 2026-10-18 (Asia/Shanghai). Environment: Windows x64, Java 21, Gradle 9.2.0, Loom 1.14.10, Yarn 1.21.11+build.4, Fabric Loader 0.18.4, Fabric API 0.141.3+1.21.11.
 
@@ -26,3 +26,13 @@ BUILD SUCCESSFUL
 The smoke process exits before the real Minecraft client/world starts. Loading third-party mixins successfully is not an end-to-end test of their live HUDs or screens. The queue policy tests use synthetic producers, not the actual HUD implementation of each mod. RusherHack was not installed or executed. Actual OBS capture ordering, private/native mod rendering, shader/renderer combinations, gameplay, resolution changes and fullscreen transitions still require manual acceptance testing.
 
 This is a HUD/GUI-focused Fabric beta. It does not implement the upstream world-object filters, auto-hide feature, legacy extension API, or NeoForge build. These limits are stated in the README and release notes.
+
+## Beta 2: Xaero minimap target regression
+
+User report: the ordinary corner minimap became enlarged and appeared at screen center when Xaero HUD exclusion was enabled; disabling the toggle restored it.
+
+Source inspection confirmed that Xaero's `ImprovedFramebuffer.bindAsMainTarget` temporarily replaces `MinecraftClient.framebuffer` while rendering the map's scaling and rotation textures. Beta 1 incorrectly used that mutable field to identify the screen, and globally overrode the framebuffer getter during overlay drawing. Both could send intermediate map rendering to the full-size overlay.
+
+Beta 2 snapshots the screen color/depth attachments at frame start, redirects only passes targeting that captured color attachment, and leaves the game's framebuffer getter unchanged. GUI command routing is restricted to GameRenderer's screen queue, preserving private texture queues.
+
+Regression coverage: `TARGET_SMOKE_PASS` checks stable screen identity across scaling/rotation/PiP target replacements; `QUEUE_SMOKE_PASS` also checks offscreen GUI queue isolation for all four producers. These are automated regression models; the user's actual Xaero gameplay/OBS result still needs confirmation.

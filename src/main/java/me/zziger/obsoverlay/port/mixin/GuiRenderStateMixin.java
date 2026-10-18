@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(GuiRenderState.class)
 public class GuiRenderStateMixin {
     @Unique private boolean route() {
-        return OBSOverlay.renderer != null && (Object)this != OBSOverlay.renderer.state && RenderRouter.hiddenProducer();
+        return RenderRouter.isScreenQueue((GuiRenderState)(Object)this) && RenderRouter.hiddenProducer();
     }
     @Inject(method = "addSimpleElement", at = @At("HEAD"), cancellable = true)
     private void simple(SimpleGuiElementRenderState value, CallbackInfo ci) {

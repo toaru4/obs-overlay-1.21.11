@@ -11,6 +11,7 @@ public final class QueueSmoke {
     public static void run() throws Exception {
         OverlayConfig oldConfig = OBSOverlay.config;
         OverlayRenderer oldRenderer = OBSOverlay.renderer;
+        GuiRenderState oldMainState = RenderRouter.mainGuiState;
         OverlayRenderer renderer = new OverlayRenderer();
         // No Minecraft client is created in preLaunch. A non-allocated target marks the router ready.
         var framebuffer = OverlayRenderer.class.getDeclaredField("framebuffer"); framebuffer.setAccessible(true);
@@ -20,6 +21,7 @@ public final class QueueSmoke {
         RenderRouter.extracting = true;
         try {
             GuiRenderState captured = new GuiRenderState();
+            RenderRouter.mainGuiState = captured;
             SimpleGuiElementRenderState quad = new ColoredQuadGuiElementRenderState(RenderPipelines.GUI, TextureSetup.empty(), new Matrix3x2f(), 0, 0, 10, 10, -1, -1, null);
             for (ModTarget target : ModTarget.values()) {
                 captured.clear(); renderer.state.clear();
@@ -35,6 +37,9 @@ public final class QueueSmoke {
                 if (RenderRouter.hiddenScreenType(screenType, false)) throw new AssertionError("HUD switch affected GUI policy");
                 submit(target, captured, quad);
                 if (count(captured) != 0 || count(renderer.state) != 1) throw new AssertionError(target + " enabled HUD escaped into captured GUI");
+                GuiRenderState intermediate = new GuiRenderState();
+                submit(target, intermediate, quad);
+                if (count(intermediate) != 1 || count(renderer.state) != 1) throw new AssertionError(target + " offscreen texture commands were moved into the screen overlay");
                 OBSOverlay.config.hud.put(target.id, false);
                 OBSOverlay.config.gui.put(target.id, true);
                 if (!RenderRouter.hiddenScreenType(screenType, false)) throw new AssertionError("GUI switch ignored for " + target);
@@ -53,8 +58,9 @@ public final class QueueSmoke {
         } finally {
             RenderRouter.extracting = false; renderer.close();
             OBSOverlay.config = oldConfig; OBSOverlay.renderer = oldRenderer;
+            RenderRouter.mainGuiState = oldMainState;
         }
-        System.out.println("QUEUE_SMOKE_PASS: eight independent HUD/GUI policies, ON/OFF routing, MaLiLib superclass, extraction boundary");
+        System.out.println("QUEUE_SMOKE_PASS: eight independent HUD/GUI policies, ON/OFF routing, MaLiLib superclass, extraction boundary, offscreen queue isolation");
     }
     private static int count(GuiRenderState state) {
         int[] count = {0}; state.forEachSimpleElement(value -> count[0]++, GuiRenderState.LayerFilter.ALL); return count[0];
