@@ -1,6 +1,6 @@
-# Validation — 3.0.0-beta.2+1.21.11
+# Validation — 3.0.0-beta.3+1.21.11
 
-Date: 2026-10-18 (Asia/Shanghai). Environment: Windows x64, Java 21, Gradle 9.2.0, Loom 1.14.10, Yarn 1.21.11+build.4, Fabric Loader 0.18.4, Fabric API 0.141.3+1.21.11.
+Date: 2026-10-21 (Asia/Shanghai). Environment: Windows x64, Java 21, Gradle 9.2.0, Loom 1.14.10, Yarn 1.21.11+build.4, Fabric Loader 0.18.4, Fabric API 0.141.3+1.21.11.
 
 ## Passed
 
@@ -36,3 +36,11 @@ Source inspection confirmed that Xaero's `ImprovedFramebuffer.bindAsMainTarget` 
 Beta 2 snapshots the screen color/depth attachments at frame start, redirects only passes targeting that captured color attachment, and leaves the game's framebuffer getter unchanged. GUI command routing is restricted to GameRenderer's screen queue, preserving private texture queues.
 
 Regression coverage: `TARGET_SMOKE_PASS` checks stable screen identity across scaling/rotation/PiP target replacements; `QUEUE_SMOKE_PASS` also checks offscreen GUI queue isolation for all four producers. These are automated regression models; the user's actual Xaero gameplay/OBS result still needs confirmation.
+
+## Beta 3: XaeroPlus transparent world map
+
+The screenshot showed map colors washed out while the world remained visible through the map background. XaeroLib's `xaerolib:pipeline/map_frame` uses RGB copy with destination-alpha preservation (ONE/ZERO, ZERO/ONE), also used by XaeroPlus transparency. The overlay starts with zero alpha, so this leaves nonzero map RGB with zero coverage. Premultiplied composition then incorrectly adds the world color to the map.
+
+The encoder now recognizes passes actually targeting the local overlay, and replaces that exact map-frame blend with premultiplied source-over. Normal screen passes, intermediate textures, map-generation pipelines and unrelated blend modes keep their original behavior. Pass transitions invalidate the cached pipeline state.
+
+Added tests: `BLEND_SMOKE_PASS` verifies the narrow blend policy; `TRANSPARENCY_GL_PASS` first reproduces the additive brightening with the old factors, then checks opaque map pixels, half-alpha edges and untouched world pixels with the correction. The hidden-window GPU test does not run the full game/OBS scene. Smoke loading additionally includes XaeroPlus 2.37.0.

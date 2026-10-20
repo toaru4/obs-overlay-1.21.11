@@ -57,7 +57,7 @@ public final class GlSmoke {
             NativeSwapHook.uninstall(); compositor.close();
             glDeleteFramebuffers(capturedFbo); glDeleteTextures(overlay); glDeleteTextures(captured);
         }
-        try { QueueSmoke.run(); }
+        try { TransparencyGlSmoke.run(); QueueSmoke.run(); }
         catch (Exception e) { throw new AssertionError("Queue routing smoke failed", e); }
         finally { glfwDestroyWindow(window); glfwTerminate(); }
     }

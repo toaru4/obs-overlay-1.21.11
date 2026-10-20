@@ -19,6 +19,7 @@ public final class MixinSmoke implements PreLaunchEntrypoint {
             }
             System.out.println("MIXIN_SMOKE_PASS");
             TargetSmoke.run();
+            BlendSmoke.run();
             if (Boolean.getBoolean("obs.overlay.glSmoke")) GlSmoke.run();
             System.exit(0);
         } catch (Throwable error) { error.printStackTrace(); System.exit(1); }
