@@ -26,13 +26,14 @@ public final class GlSmoke {
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, captured, 0);
         if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) throw new AssertionError("Test framebuffer incomplete");
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glClearColor(0, 0, 0, 1); glClear(GL_COLOR_BUFFER_BIT);
+        glClearColor(1, 0, 1, 1); glClear(GL_COLOR_BUFFER_BIT);
         glBindFramebuffer(GL_FRAMEBUFFER, capturedFbo);
         glViewport(3, 4, 19, 23);
         glEnable(GL_SCISSOR_TEST);
         glScissor(1, 2, 5, 6);
         glEnable(GL_DEPTH_TEST);
         glDisable(GL_BLEND);
+        glColorMask(false, true, false, false);
         LocalCompositor compositor = new LocalCompositor();
         int[] callbacks = {0};
         try {
@@ -40,6 +41,8 @@ public final class GlSmoke {
                 compositor.draw(overlay, 64, 64);
                 if (glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING) != capturedFbo || glGetInteger(GL_READ_FRAMEBUFFER_BINDING) != capturedFbo) throw new AssertionError("Framebuffer state not restored");
                 if (!glIsEnabled(GL_SCISSOR_TEST) || !glIsEnabled(GL_DEPTH_TEST) || glIsEnabled(GL_BLEND)) throw new AssertionError("GL capability state not restored");
+                ByteBuffer mask = org.lwjgl.BufferUtils.createByteBuffer(4); glGetBooleanv(GL_COLOR_WRITEMASK, mask);
+                if (mask.get(0) != 0 || mask.get(1) == 0 || mask.get(2) != 0 || mask.get(3) != 0) throw new AssertionError("Color write mask not restored");
                 int[] viewport = new int[4]; glGetIntegerv(GL_VIEWPORT, viewport);
                 if (!java.util.Arrays.equals(viewport, new int[]{3,4,19,23})) throw new AssertionError("Viewport not restored");
                 expectPixel(255, 0, 0); // The captured main texture remains unchanged.
@@ -56,8 +59,9 @@ public final class GlSmoke {
         } finally {
             NativeSwapHook.uninstall(); compositor.close();
             glDeleteFramebuffers(capturedFbo); glDeleteTextures(overlay); glDeleteTextures(captured);
+            glColorMask(true, true, true, true);
         }
-        try { TransparencyGlSmoke.run(); QueueSmoke.run(); }
+        try { TransparencyGlSmoke.run(); LayerGlSmoke.run(); QueueSmoke.run(); }
         catch (Exception e) { throw new AssertionError("Queue routing smoke failed", e); }
         finally { glfwDestroyWindow(window); glfwTerminate(); }
     }

@@ -6,6 +6,7 @@ import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.blaze3d.textures.GpuTexture;
 import me.zziger.obsoverlay.port.*;
 import net.minecraft.client.gl.GlCommandEncoder;
 import java.util.OptionalDouble;
@@ -24,6 +25,10 @@ public class GlCommandEncoderMixin {
     @Unique private boolean obs$overlayPass;
     @WrapMethod(method = "createRenderPass(Ljava/util/function/Supplier;Lcom/mojang/blaze3d/textures/GpuTextureView;Ljava/util/OptionalInt;Lcom/mojang/blaze3d/textures/GpuTextureView;Ljava/util/OptionalDouble;)Lcom/mojang/blaze3d/systems/RenderPass;")
     private RenderPass route(Supplier<String> name, GpuTextureView color, OptionalInt clearColor, GpuTextureView depth, OptionalDouble clearDepth, Operation<RenderPass> original) {
+        boolean mirror = OBSOverlay.renderer != null && OBSOverlay.renderer.localScene() != null
+                && RenderRouter.extracting && !RenderRouter.renderingOverlay && !RenderRouter.hiddenProducer()
+                && color != null && RenderRouter.isScreenTarget(color.texture());
+        boolean screenDepth = depth != null && depth.texture() == RenderRouter.mainDepthTexture;
         if (OBSOverlay.renderer != null && OBSOverlay.renderer.ready()
                 && color != null && RenderRouter.isScreenTarget(color.texture())
                 && (RenderRouter.renderingOverlay || RenderRouter.hiddenProducer())) {
@@ -37,7 +42,19 @@ public class GlCommandEncoderMixin {
                 && color.texture() == OBSOverlay.renderer.framebuffer().getColorAttachment();
         if (overlay != obs$overlayPass) currentPipeline = null;
         obs$overlayPass = overlay;
+        if (mirror) {
+            var scene = OBSOverlay.renderer.localScene();
+            var localDepth = screenDepth ? scene.getDepthAttachmentView() : depth;
+            return new MirroredRenderPass(pass, () -> original.call(name, scene.getColorAttachmentView(), clearColor, localDepth, clearDepth));
+        }
         return pass;
+    }
+    @WrapMethod(method = "clearDepthTexture")
+    private void obs$mirrorDepthClear(GpuTexture texture, double value, Operation<Void> original) {
+        original.call(texture, value);
+        var overlay = OBSOverlay.renderer;
+        if (overlay != null && overlay.localScene() != null && !RenderRouter.renderingOverlay
+                && texture == RenderRouter.mainDepthTexture) original.call(overlay.localScene().getDepthAttachment(), value);
     }
     @WrapOperation(method = "setPipelineAndApplyState", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/pipeline/RenderPipeline;getBlendFunction()Ljava/util/Optional;", remap = false))
     private Optional<BlendFunction> overlayBlend(RenderPipeline pipeline, Operation<Optional<BlendFunction>> original) {

@@ -6,6 +6,7 @@ import static org.lwjgl.opengl.GL33C.*;
 public final class LocalCompositor implements AutoCloseable {
     private final int program;
     private final int vao;
+    private final int compositionFbo;
     public LocalCompositor() {
         int vertex = compile(GL_VERTEX_SHADER, """
                 #version 330 core
@@ -27,6 +28,7 @@ public final class LocalCompositor implements AutoCloseable {
         glDeleteShader(vertex); glDeleteShader(fragment);
         if (glGetProgrami(program, GL_LINK_STATUS) == GL_FALSE) throw new IllegalStateException(glGetProgramInfoLog(program));
         vao = glGenVertexArrays();
+        compositionFbo = glGenFramebuffers();
     }
     private static int compile(int type, String source) {
         int shader = glCreateShader(type); glShaderSource(shader, source); glCompileShader(shader);
@@ -34,18 +36,36 @@ public final class LocalCompositor implements AutoCloseable {
         return shader;
     }
     public void draw(int texture, int width, int height) {
+        draw(texture, 0, width, height, false);
+    }
+    /** A complete local scene replaces the backbuffer; a transparent layer uses source-over. */
+    public void draw(int texture, int width, int height, boolean replace) {
+        draw(texture, 0, width, height, replace);
+    }
+    public void drawToTexture(int texture, int destination, int width, int height, boolean replace) {
+        draw(texture, destination, width, height, replace);
+    }
+    private void draw(int texture, int destination, int width, int height, boolean replace) {
         int oldProgram = glGetInteger(GL_CURRENT_PROGRAM), oldVao = glGetInteger(GL_VERTEX_ARRAY_BINDING);
         int drawFb = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING), readFb = glGetInteger(GL_READ_FRAMEBUFFER_BINDING);
         int activeTexture = glGetInteger(GL_ACTIVE_TEXTURE);
         int[] viewport = new int[4]; glGetIntegerv(GL_VIEWPORT, viewport);
+        java.nio.ByteBuffer colorMask = org.lwjgl.BufferUtils.createByteBuffer(4);
+        glGetBooleanv(GL_COLOR_WRITEMASK, colorMask);
         boolean blend = glIsEnabled(GL_BLEND), depth = glIsEnabled(GL_DEPTH_TEST), cull = glIsEnabled(GL_CULL_FACE), scissor = glIsEnabled(GL_SCISSOR_TEST), srgb = glIsEnabled(GL_FRAMEBUFFER_SRGB);
         int srcRgb = glGetInteger(GL_BLEND_SRC_RGB), dstRgb = glGetInteger(GL_BLEND_DST_RGB), srcA = glGetInteger(GL_BLEND_SRC_ALPHA), dstA = glGetInteger(GL_BLEND_DST_ALPHA);
         int eqRgb = glGetInteger(GL_BLEND_EQUATION_RGB), eqA = glGetInteger(GL_BLEND_EQUATION_ALPHA);
         glActiveTexture(GL_TEXTURE0);
         int oldTexture = glGetInteger(GL_TEXTURE_BINDING_2D), oldSampler = glGetInteger(GL_SAMPLER_BINDING);
         try {
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); glViewport(0, 0, width, height);
-            glEnable(GL_BLEND); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glDisable(GL_SCISSOR_TEST); glDisable(GL_FRAMEBUFFER_SRGB);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, destination == 0 ? 0 : compositionFbo);
+            if (destination != 0) {
+                glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, destination, 0);
+                if (glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) throw new IllegalStateException("Incomplete local composition target");
+            }
+            glViewport(0, 0, width, height);
+            glColorMask(true, true, true, true);
+            enabled(GL_BLEND, !replace); glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glDisable(GL_SCISSOR_TEST); glDisable(GL_FRAMEBUFFER_SRGB);
             // Offscreen GUI color is already premultiplied by its translucent pipelines.
             glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA); glBlendEquation(GL_FUNC_ADD);
             glUseProgram(program); glBindVertexArray(vao); glBindSampler(0, 0); glBindTexture(GL_TEXTURE_2D, texture);
@@ -56,10 +76,11 @@ public final class LocalCompositor implements AutoCloseable {
             glUseProgram(oldProgram); glBindVertexArray(oldVao);
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, drawFb); glBindFramebuffer(GL_READ_FRAMEBUFFER, readFb);
             glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+            glColorMask(colorMask.get(0) != 0, colorMask.get(1) != 0, colorMask.get(2) != 0, colorMask.get(3) != 0);
             glBlendFuncSeparate(srcRgb, dstRgb, srcA, dstA); glBlendEquationSeparate(eqRgb, eqA);
             enabled(GL_BLEND, blend); enabled(GL_DEPTH_TEST, depth); enabled(GL_CULL_FACE, cull); enabled(GL_SCISSOR_TEST, scissor); enabled(GL_FRAMEBUFFER_SRGB, srgb);
         }
     }
     private static void enabled(int capability, boolean enabled) { if (enabled) glEnable(capability); else glDisable(capability); }
-    @Override public void close() { glDeleteProgram(program); glDeleteVertexArrays(vao); }
+    @Override public void close() { glDeleteProgram(program); glDeleteVertexArrays(vao); glDeleteFramebuffers(compositionFbo); }
 }

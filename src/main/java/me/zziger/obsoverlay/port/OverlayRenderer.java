@@ -13,6 +13,8 @@ import me.zziger.obsoverlay.port.mixin.GuiRendererAccessor;
 public final class OverlayRenderer implements AutoCloseable {
     public final GuiRenderState state = new GuiRenderState();
     private Framebuffer framebuffer;
+    private Framebuffer localScene;
+    private boolean sceneActive;
     private final LocalCompositor compositor;
     private boolean dirty;
     private boolean active;
@@ -25,8 +27,14 @@ public final class OverlayRenderer implements AutoCloseable {
     }
     public boolean ready() { return active && framebuffer != null; }
     public Framebuffer framebuffer() { return framebuffer; }
+    public Framebuffer localScene() { return sceneActive ? localScene : null; }
+    public boolean mirrorScreen(Framebuffer target) {
+        return ready() && sceneActive && !RenderRouter.renderingOverlay
+                && target != null && RenderRouter.isScreenTarget(target.getColorAttachment());
+    }
     public void markDirty() { dirty = true; }
     public void beginFrame() {
+        sceneActive = false;
         RenderRouter.extracting = false;
         RenderRouter.screen = false;
         RenderRouter.screenOverlay = false;
@@ -42,6 +50,28 @@ public final class OverlayRenderer implements AutoCloseable {
         state.clear();
         dirty = false;
         testIconDrawn = false;
+    }
+    /** Called after HUD submission, before extracting the first screen. Never writes the captured color. */
+    public void beginScreenScene() {
+        if (!ready() || sceneActive) return;
+        int width = framebuffer.textureWidth, height = framebuffer.textureHeight;
+        if (localScene == null) localScene = new SimpleFramebuffer("OBS complete local scene", width, height, true);
+        else if (localScene.textureWidth != width || localScene.textureHeight != height) localScene.resize(width, height);
+        compositor.drawToTexture(((GlTexture)RenderRouter.mainColorTexture).getGlId(),
+                ((GlTexture)localScene.getColorAttachment()).getGlId(), width, height, true);
+        sceneActive = true;
+        mergeOverlay();
+        // The screen starts a new submission, so its depth must not collide with the flushed HUD.
+        var encoder = RenderSystem.getDevice().createCommandEncoder();
+        encoder.clearDepthTexture(RenderRouter.mainDepthTexture, 1.0);
+        encoder.clearDepthTexture(localScene.getDepthAttachment(), 1.0);
+    }
+    private void mergeOverlay() {
+        if (!sceneActive || !dirty) return;
+        compositor.drawToTexture(((GlTexture)framebuffer.getColorAttachment()).getGlId(),
+                ((GlTexture)localScene.getColorAttachment()).getGlId(), framebuffer.textureWidth, framebuffer.textureHeight, false);
+        RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(framebuffer.getColorAttachment(), 0, framebuffer.getDepthAttachment(), 1.0);
+        dirty = false;
     }
     public void renderGui(GuiRenderer renderer, GpuBufferSlice fog) {
         if (ready() && OBSOverlay.config.showTestIcon && !testIconDrawn) {
@@ -67,14 +97,20 @@ public final class OverlayRenderer implements AutoCloseable {
             access.obs$setState(original);
             RenderRouter.renderingOverlay = false;
         }
+        mergeOverlay();
     }
     private void present() {
-        if (ready() && dirty && framebuffer.getColorAttachment() instanceof GlTexture texture) compositor.draw(texture.getGlId(), framebuffer.textureWidth, framebuffer.textureHeight);
+        if (!ready()) return;
+        if (sceneActive) {
+            mergeOverlay();
+            compositor.draw(((GlTexture)localScene.getColorAttachment()).getGlId(), localScene.textureWidth, localScene.textureHeight, true);
+        } else if (dirty && framebuffer.getColorAttachment() instanceof GlTexture texture) compositor.draw(texture.getGlId(), framebuffer.textureWidth, framebuffer.textureHeight);
     }
     @Override public void close() {
         active = false;
         NativeSwapHook.uninstall();
         if (framebuffer != null) framebuffer.delete();
+        if (localScene != null) localScene.delete();
         compositor.close();
     }
 }
