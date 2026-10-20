@@ -55,12 +55,34 @@ public final class QueueSmoke {
             OBSOverlay.config.hud.put("meteor", true);
             submit(ModTarget.METEOR, captured, quad);
             if (count(captured) != 1 || count(renderer.state) != 0) throw new AssertionError("World/non-extraction commands incorrectly routed");
+            OBSOverlay.config.hud.put("meteor", false);
+            captured.clear(); renderer.state.clear();
+            // Meteor renders ClickGUI after the first vanilla submission, outside the normal scope.
+            try (var lateScreen = RenderRouter.screenScope(true)) {
+                if (!RenderRouter.extracting || !RenderRouter.screen) throw new AssertionError("Late screen extraction not enabled");
+                submit(ModTarget.METEOR, captured, quad);
+                if (count(captured) != 0 || count(renderer.state) != 1) throw new AssertionError("Late ClickGUI command escaped into capture with HUD disabled");
+                GuiRenderState privateTexture = new GuiRenderState();
+                submit(ModTarget.METEOR, privateTexture, quad);
+                if (count(privateTexture) != 1 || count(renderer.state) != 1) throw new AssertionError("Late screen intercepted a private texture");
+                try (var visible = RenderRouter.screenScope(false)) {
+                    submit(ModTarget.METEOR, captured, quad);
+                    if (count(captured) != 1) throw new AssertionError("Visible nested screen was hidden");
+                }
+                if (!RenderRouter.hiddenProducer()) throw new AssertionError("Nested scope failed to restore GUI policy");
+            }
+            if (RenderRouter.extracting || RenderRouter.screen || RenderRouter.screenOverlay) throw new AssertionError("Late screen scope leaked outside GUI drawing");
+            try {
+                try (var lateScreen = RenderRouter.screenScope(true)) { throw new IllegalStateException("Test callback error"); }
+            } catch (IllegalStateException expected) {}
+            if (RenderRouter.extracting || RenderRouter.screen) throw new AssertionError("Failed render callback leaked its scope");
         } finally {
             RenderRouter.extracting = false; renderer.close();
             OBSOverlay.config = oldConfig; OBSOverlay.renderer = oldRenderer;
             RenderRouter.mainGuiState = oldMainState;
         }
         System.out.println("QUEUE_SMOKE_PASS: eight independent HUD/GUI policies, ON/OFF routing, MaLiLib superclass, extraction boundary, offscreen queue isolation");
+        System.out.println("LATE_GUI_SMOKE_PASS: ClickGUI extraction after vanilla submit, independent HUD toggle, nested scopes and exception cleanup");
     }
     private static int count(GuiRenderState state) {
         int[] count = {0}; state.forEachSimpleElement(value -> count[0]++, GuiRenderState.LayerFilter.ALL); return count[0];

@@ -18,6 +18,13 @@ public final class MixinSmoke implements PreLaunchEntrypoint {
                 System.out.println("MIXIN_SMOKE_TRANSFORMED: " + type);
             }
             System.out.println("MIXIN_SMOKE_PASS");
+            if (net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("meteor-client")) {
+                Class<?> screen = Class.forName("meteordevelopment.meteorclient.gui.WidgetScreen", false, Thread.currentThread().getContextClassLoader());
+                if (java.util.Arrays.stream(screen.getDeclaredMethods()).noneMatch(method -> method.getName().contains("obs") && method.getName().contains("renderCustom"))) {
+                    throw new AssertionError("Meteor renderCustom wrapper missing");
+                }
+                System.out.println("METEOR_MIXIN_PASS: real WidgetScreen.renderCustom transformed");
+            }
             TargetSmoke.run();
             BlendSmoke.run();
             if (Boolean.getBoolean("obs.overlay.glSmoke")) GlSmoke.run();

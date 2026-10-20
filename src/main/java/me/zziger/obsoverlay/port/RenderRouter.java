@@ -10,8 +10,18 @@ public final class RenderRouter {
     private static final StackWalker WALKER = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
     public static boolean extracting;
     public static boolean screen;
+    public static boolean screenOverlay;
     public static boolean renderingOverlay;
     public static int vanillaScope;
+    public static ScreenScope screenScope(boolean hidden) { return new ScreenScope(hidden); }
+    /** Screen renderers may run after vanilla GUI submission (e.g. Meteor renderCustom). */
+    public static final class ScreenScope implements AutoCloseable {
+        private final boolean previousExtracting = extracting;
+        private final boolean previousScreen = screen;
+        private final boolean previousOverlay = screenOverlay;
+        private ScreenScope(boolean hidden) { extracting = true; screen = true; screenOverlay = hidden; }
+        @Override public void close() { extracting = previousExtracting; screen = previousScreen; screenOverlay = previousOverlay; }
+    }
     // Only commands destined for the game's screen may be moved to the local overlay.
     // Mods also use GuiRenderState for intermediate textures with their own coordinates.
     public static GuiRenderState mainGuiState;
@@ -32,7 +42,7 @@ public final class RenderRouter {
     }
     public static boolean hiddenProducer() {
         if (!extracting || renderingOverlay || OBSOverlay.renderer == null || !OBSOverlay.renderer.ready()) return false;
-        if (screen) return hiddenScreen(MinecraftClient.getInstance().currentScreen);
+        if (screen) return screenOverlay;
         if (vanillaScope > 0) return true;
         OverlayConfig config = OBSOverlay.config;
         if (!config.anyHud()) return false;

@@ -9,9 +9,8 @@ import org.spongepowered.asm.mixin.Mixin;
 public class ScreenMixin {
     @WrapMethod(method = "renderWithTooltip")
     private void render(DrawContext context, int mouseX, int mouseY, float delta, Operation<Void> original) {
-        boolean previous = RenderRouter.screen;
-        RenderRouter.screen = true;
-        try { original.call(context, mouseX, mouseY, delta); }
-        finally { RenderRouter.screen = previous; }
+        try (var scope = RenderRouter.screenScope(RenderRouter.hiddenScreen((Screen)(Object)this))) {
+            original.call(context, mouseX, mouseY, delta);
+        }
     }
 }

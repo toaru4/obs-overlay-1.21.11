@@ -16,6 +16,7 @@ public final class OverlayRenderer implements AutoCloseable {
     private final LocalCompositor compositor;
     private boolean dirty;
     private boolean active;
+    private boolean testIconDrawn;
     public OverlayRenderer() {
         compositor = new LocalCompositor();
         try { NativeSwapHook.install(this::present); }
@@ -28,6 +29,7 @@ public final class OverlayRenderer implements AutoCloseable {
     public void beginFrame() {
         RenderRouter.extracting = false;
         RenderRouter.screen = false;
+        RenderRouter.screenOverlay = false;
         RenderRouter.renderingOverlay = false;
         RenderRouter.vanillaScope = 0;
         var window = MinecraftClient.getInstance().getWindow();
@@ -39,14 +41,16 @@ public final class OverlayRenderer implements AutoCloseable {
         RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(framebuffer.getColorAttachment(), 0, framebuffer.getDepthAttachment(), 1.0);
         state.clear();
         dirty = false;
+        testIconDrawn = false;
     }
     public void renderGui(GuiRenderer renderer, GpuBufferSlice fog) {
-        if (ready() && OBSOverlay.config.showTestIcon) {
+        if (ready() && OBSOverlay.config.showTestIcon && !testIconDrawn) {
             var client = MinecraftClient.getInstance();
             var context = new net.minecraft.client.gui.DrawContext(client, state, 0, 0);
             context.fill(4, 4, 112, 20, 0xE0008800);
             context.drawTextWithShadow(client.textRenderer, "OBS LOCAL ONLY", 8, 8, 0xFFFFFFFF);
             dirty = true;
+            testIconDrawn = true;
         }
         if (!ready() || !dirty) return;
         GuiRendererAccessor access = (GuiRendererAccessor) renderer;

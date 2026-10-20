@@ -1,4 +1,4 @@
-# Validation — 3.0.0-beta.3+1.21.11
+# Validation — 3.0.0-beta.4+1.21.11
 
 Date: 2026-10-21 (Asia/Shanghai). Environment: Windows x64, Java 21, Gradle 9.2.0, Loom 1.14.10, Yarn 1.21.11+build.4, Fabric Loader 0.18.4, Fabric API 0.141.3+1.21.11.
 
@@ -44,3 +44,11 @@ The screenshot showed map colors washed out while the world remained visible thr
 The encoder now recognizes passes actually targeting the local overlay, and replaces that exact map-frame blend with premultiplied source-over. Normal screen passes, intermediate textures, map-generation pipelines and unrelated blend modes keep their original behavior. Pass transitions invalidate the cached pipeline state.
 
 Added tests: `BLEND_SMOKE_PASS` verifies the narrow blend policy; `TRANSPARENCY_GL_PASS` first reproduces the additive brightening with the old factors, then checks opaque map pixels, half-alpha edges and untouched world pixels with the correction. The hidden-window GPU test does not run the full game/OBS scene. Smoke loading additionally includes XaeroPlus 2.37.0.
+
+## Beta 4: Meteor / Meteorite ClickGUI after vanilla GUI submission
+
+The user's screenshot showed the local-only marker excluded while ClickGUI was still captured. The user's GUI filter was enabled. Source inspection of Meteor 1.21.11-86 and the installed Meteorite 1.21.11-757 confirmed that WidgetScreen.renderCustom runs from a GameRenderer injection after the initial vanilla GuiRenderer.render call, followed by another GUI submission. Earlier versions had ended their screen scope and only drained the overlay queue at the initial submission.
+
+An optional WidgetScreen.renderCustom wrapper now opens a screen extraction scope for the custom meshes and queued elements. Every submission of the actual screen GuiRenderer drains pending overlay commands, including Meteor's subsequent flush. Offscreen renderers remain isolated; overlay rendering cannot recursively drain itself. The test marker is queued at most once per frame. Meteor is still optional.
+
+Regression coverage: METEOR_MIXIN_PASS checks the real WidgetScreen transformation; LATE_GUI_SMOKE_PASS models the late extraction with the HUD filter off, checks nested visible/hidden scopes, private queue isolation and exception cleanup. Existing target, blend and hidden OpenGL pixel tests also pass with the official Meteor test setup. These checks do not establish a live OBS acceptance result.
