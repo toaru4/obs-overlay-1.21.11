@@ -52,3 +52,6 @@ The user's screenshot showed the local-only marker excluded while ClickGUI was s
 An optional WidgetScreen.renderCustom wrapper now opens a screen extraction scope for the custom meshes and queued elements. Every submission of the actual screen GuiRenderer drains pending overlay commands, including Meteor's subsequent flush. Offscreen renderers remain isolated; overlay rendering cannot recursively drain itself. The test marker is queued at most once per frame. Meteor is still optional.
 
 Regression coverage: METEOR_MIXIN_PASS checks the real WidgetScreen transformation; LATE_GUI_SMOKE_PASS models the late extraction with the HUD filter off, checks nested visible/hidden scopes, private queue isolation and exception cleanup. Existing target, blend and hidden OpenGL pixel tests also pass with the official Meteor test setup. These checks do not establish a live OBS acceptance result.
+
+Additional compatibility run passed with the user's Meteorite build 757 (metadata: meteor-client 1.21.11-sota), Fabric Loader 0.19.5 and MixinExtras 0.5.5. METEOR_MIXIN_PASS, LATE_GUI_SMOKE_PASS and all hidden-window regression markers passed. GitHub's clean build/smoke run for code commit 22aa840 also passed without Meteor installed, verifying that the optional integration does not make Meteor a dependency.
+
