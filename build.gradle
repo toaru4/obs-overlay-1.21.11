@@ -3,6 +3,9 @@ plugins {
  id 'maven-publish'
 }
 group = 'me.zziger.obsoverlay'
+if (project.hasProperty('glSmoke') && project.hasProperty('vkSmoke')) {
+    throw new GradleException('Run glSmoke and vkSmoke in separate invocations: SDL native bootstrap is process-scoped.')
+}
 version = project.mod_version
 base { archivesName = 'obs-overlay-fabric' }
 repositories {
@@ -22,6 +25,7 @@ jar { from('LICENSE', 'MINHOOK-LICENSE.txt') }
 
 sourceSets {
     smoke {
+        java.setSrcDirs(['src/smoke26/java'])
         compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
         runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
     }
@@ -32,10 +36,13 @@ loom {
     runs {
         smoke {
             client()
+            runDir 'run26_3'
             name 'Mixin smoke test'
             source sourceSets.main
             vmArg '-Dfabric.addMods=' + layout.buildDirectory.file('smoke/overlay-smoke.jar').get().asFile.absolutePath
             if (project.hasProperty('glSmoke')) vmArg '-Dobs.overlay.glSmoke=true'
+            if (project.hasProperty('desktopSmoke')) vmArg '-Dobs.overlay.desktopSmoke=true'
+            if (project.hasProperty('vkSmoke')) vmArg '-Dobs.overlay.vkSmoke=true'
         }
     }
     mods {
@@ -55,4 +62,12 @@ tasks.register('policyTest', JavaExec) {
     mainClass = 'me.zziger.obsoverlay.port.PolicyTest'
 }
 check.dependsOn policyTest
+['RenderPassContractTest', 'RenderTargetRouterTest'].each { contract ->
+    def verification = tasks.register(contract, JavaExec) {
+        dependsOn testClasses
+        classpath = sourceSets.test.runtimeClasspath
+        mainClass = contract
+    }
+    check.dependsOn verification
+}
 test { failOnNoDiscoveredTests = false }

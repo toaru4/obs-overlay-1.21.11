@@ -44,6 +44,7 @@ public final class SettingsScreen extends Screen {
     @Override public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         super.extractRenderState(context, mouseX, mouseY, delta);
         context.centeredText(font, title, width / 2, 12, 0xFFFFFFFF);
+        if(OBSOverlay.renderer!=null) context.centeredText(font,OBSOverlay.renderer.presentationDescription(),width/2,height-86,0xFFB0C8D8);
         context.centeredText(font, Component.translatable(OBSOverlay.renderer != null && OBSOverlay.renderer.ready() ? "obs_overlay.ready" : "obs_overlay.unavailable"), width / 2, height - 72, OBSOverlay.renderer != null && OBSOverlay.renderer.ready() ? 0xFF80FF80 : 0xFFFF8080);
     }
     @Override public void onClose() { OBSOverlay.config.save(); minecraft.setScreenAndShow(parent); }

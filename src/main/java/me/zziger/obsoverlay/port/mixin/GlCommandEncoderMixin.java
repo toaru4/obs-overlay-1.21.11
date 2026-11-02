@@ -15,12 +15,12 @@ public class GlCommandEncoderMixin {
         var overlay = OBSOverlay.renderer;
         if (overlay == null || !overlay.ready() || !RenderTargetRouter.targets(descriptor, RenderRouter.mainColorTexture)) return original.call(descriptor);
         if (RenderRouter.renderingOverlay || RenderRouter.hiddenProducer()) {
-            var target = overlay.framebuffer();
+            var target = overlay.localScene()!=null ? overlay.localScene() : overlay.framebuffer();
             overlay.markDirty();
             return original.call(RenderTargetRouter.redirect(descriptor, RenderRouter.mainColorTexture, RenderRouter.mainDepthTexture, target.getColorTextureView(), target.getDepthTextureView()));
         }
         RenderPass pass = original.call(descriptor);
-        if (RenderRouter.extracting && overlay.localScene() != null) {
+        if (RenderRouter.extracting && !RenderRouter.mainGuiDraw && overlay.localScene() != null) {
             var target = overlay.localScene();
             var local = RenderTargetRouter.redirect(descriptor, RenderRouter.mainColorTexture, RenderRouter.mainDepthTexture, target.getColorTextureView(), target.getDepthTextureView());
             return new MirroredRenderPass(pass, () -> original.call(local));
@@ -29,8 +29,12 @@ public class GlCommandEncoderMixin {
     }
     @WrapMethod(method = "clearDepthTexture")
     private void obs$mirrorDepthClear(GpuTexture texture, double value, Operation<Void> original) {
-        original.call(texture, value);
         var overlay = OBSOverlay.renderer;
+        if (overlay != null && overlay.ready() && RenderRouter.renderingOverlay && texture == RenderRouter.mainDepthTexture) {
+            original.call(overlay.framebuffer().getDepthTexture(), value);
+            return;
+        }
+        original.call(texture, value);
         if (overlay != null && overlay.localScene() != null && !RenderRouter.renderingOverlay && texture == RenderRouter.mainDepthTexture) original.call(overlay.localScene().getDepthTexture(), value);
     }
 }

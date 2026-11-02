@@ -12,6 +12,14 @@ public final class RenderRouter {
     public static boolean screen;
     public static boolean screenOverlay;
     public static boolean renderingOverlay;
+    public static boolean submittingGui;
+    public static boolean mainGuiDraw;
+    public static Boolean meteorScreenQueue;
+    public static boolean consumeMeteorQueuePolicy() {
+        Boolean gui=meteorScreenQueue;
+        meteorScreenQueue=null;
+        return gui!=null?gui:OBSOverlay.config.enabled(ModTarget.METEOR,false);
+    }
     public static int vanillaScope;
     public static ScreenScope screenScope(boolean hidden) { return new ScreenScope(hidden); }
     /** Screen renderers may run after vanilla GUI submission (e.g. Meteor renderCustom). */

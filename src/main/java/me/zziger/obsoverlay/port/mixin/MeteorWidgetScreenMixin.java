@@ -16,6 +16,7 @@ public class MeteorWidgetScreenMixin {
     private void obs$renderCustom(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta, Operation<Void> original) {
         try (var scope = RenderRouter.screenScope(RenderRouter.hiddenScreen((Screen)(Object)this))) {
             original.call(context, mouseX, mouseY, delta);
+            RenderRouter.meteorScreenQueue=RenderRouter.hiddenScreen((Screen)(Object)this);
         }
     }
 }

@@ -11,7 +11,8 @@ import java.util.Map;
 
 public final class OverlayConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final Path PATH = FabricLoader.getInstance().getConfigDir().resolve("obs_overlay-1.21.11.json");
+    private static final Path PATH = FabricLoader.getInstance().getConfigDir().resolve("obs_overlay-26.3.json");
+    private static final Path LEGACY_PATH = PATH.resolveSibling("obs_overlay-1.21.11.json");
     public Map<String, Boolean> hud = new LinkedHashMap<>();
     public Map<String, Boolean> gui = new LinkedHashMap<>();
     public Map<String, Boolean> vanilla = new LinkedHashMap<>();
@@ -24,11 +25,12 @@ public final class OverlayConfig {
     public boolean enabled(ModTarget target, boolean screen) { return Boolean.TRUE.equals((screen ? gui : hud).get(target.id)); }
     public boolean anyHud() { return hud.containsValue(true); }
     public static OverlayConfig load() {
-        if (Files.isRegularFile(PATH)) {
-            try (var reader = Files.newBufferedReader(PATH)) {
+        Path source = Files.isRegularFile(PATH) ? PATH : LEGACY_PATH;
+        if (Files.isRegularFile(source)) {
+            try (var reader = Files.newBufferedReader(source)) {
                 OverlayConfig value = GSON.fromJson(reader, OverlayConfig.class);
                 if (value != null && value.hud != null && value.gui != null && value.vanilla != null) return value;
-            } catch (IOException | RuntimeException e) { OBSOverlay.LOGGER.error("Cannot read {}", PATH, e); }
+            } catch (IOException | RuntimeException e) { OBSOverlay.LOGGER.error("Cannot read {}", source, e); }
         }
         return new OverlayConfig();
     }
