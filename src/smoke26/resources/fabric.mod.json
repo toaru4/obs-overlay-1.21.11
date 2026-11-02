@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"obs_overlay_smoke","version":"1.0.0","environment":"client","entrypoints":{"preLaunch":["smoke.MixinSmoke"]},"mixins":["smoke26.mixins.json"],"depends":{"obs_overlay":"*"}}

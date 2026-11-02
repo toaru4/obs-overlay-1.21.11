@@ -1,8 +1,15 @@
 # OBS Overlay — Minecraft 26.3（实验性适配）
 
-基于 [zziger/obs-overlay](https://github.com/zziger/obs-overlay)（MIT），面向无规则服务器使用场景的 Fabric / Windows x64 移植。当前分支为 `port/minecraft-26.3`，版本 `4.0.0-alpha.2+26.3`。
+基于 [zziger/obs-overlay](https://github.com/zziger/obs-overlay)（MIT），面向无规则服务器使用场景的 Fabric / Windows x64 移植。当前分支为 `port/minecraft-26.3`，版本 `4.0.0-alpha.3+26.3`。
 
-选中的 HUD、GUI 仅在本地显示，目标是在 OBS 游戏采集中排除。**目前已通过构建、Mixin、真实 GPU 隔离测试，尚未完成真实游戏与 OBS 的录制验收，请勿用于未经预览检查的正式直播。**
+选中的 HUD、GUI 仅在本地显示，目标是在 OBS 游戏采集中排除。**目前已通过构建、Mixin、真实 GPU 隔离和本地世界渲染测试，尚未完成实际 OBS 录制验收，请勿用于未经预览检查的正式直播。**
+
+## alpha.3：本地黑屏修复与 Sodium 组合
+
+- 本地窗口改用 `WM_PAINT` 保留帧重绘，补上 CPU / GDI 位图读写同步；仅在位置或尺寸改变时重设窗口，避免反复使受保护的窗口内容失效。
+- 无法重绘时隐藏本地窗口并停用过滤，设置页显示停用状态，避免留下遮住游戏的空白窗口。
+- 已验证 **Meteor 26.3-15 + Sodium 0.9.2+mc26.3**。`0.9.3-beta.1` 与该版 Meteor 的流体注入存在上游已确认冲突，请替换为 0.9.2，不要同时放两版 Sodium。[上游说明](https://github.com/MeteorDevelopment/meteor-client/issues/6737)。
+- 本轮完成真实客户端主菜单、自动创建本地世界，以及可见窗口像素/重绘/缩放测试；Vulkan 组合加入了 Singularity 23 与 ImmediatelyFast 1.17.1。实际 OBS 录制和用户报告的间歇黑屏仍需在原使用场景复测，不能仅凭测试断言所有显示问题消失。
 
 ## alpha.2 热修复
 
@@ -19,8 +26,8 @@ Vulkan 窗口采用 GDI 软件绘制，没有额外的图形交换链；启用 `
 
 ## 安装与设置
 
-1. Minecraft **26.3**、Java **25**、Fabric Loader **0.19.5 或更新版本**，以及对应版本 Fabric API。
-2. 放入 `obs-overlay-fabric-4.0.0-alpha.2+26.3.jar`。不要与 1.21.11 版同时安装。
+1. Minecraft **26.3**、Java **25**、Fabric Loader **0.20.1 或更新版本**，以及对应版本 Fabric API。
+2. 放入 `obs-overlay-fabric-4.0.0-alpha.3+26.3.jar`。不要与 1.21.11 版同时安装。
 3. 打开 **选项 → 视频设置 → OBS Overlay 设置**；Mod Menu 可选。
 4. 分别设置 Meteor、RusherHack、Xaero、MaLiLib 的 HUD / GUI 开关。开启表示仅本地显示；关闭表示正常录制。模组开关默认关闭。
 5. OBS 使用游戏采集，关闭采集源的「采集第三方叠加层」。打开「录制测试标记」，确认本地有 `OBS LOCAL ONLY`，OBS 预览没有。
@@ -47,6 +54,6 @@ Vulkan 窗口采用 GDI 软件绘制，没有额外的图形交换链；启用 `
 ./gradlew runSmoke -PvkSmoke -PdesktopSmoke -x downloadAssets
 ```
 
-后两项需要 Windows x64 与相应显卡支持。默认 smoke 不启动完整游戏，不应将它解释为 OBS 录制验收。第三方测试模组可放到独立的 `run26_3/mods`；不打包进发布 JAR。
+后两项需要 Windows x64 与相应显卡支持。`-PvisibleSmoke` 会短暂显示一个不抢焦点的纯色窗口，验证重绘和缩放；`-PgameSmoke` 会在 `run26_3` 中启动完整客户端并创建独立测试世界，需要已下载的游戏资源，不能和 GPU 单元 smoke 标记同时使用。默认 smoke 不启动完整游戏，不应将它解释为 OBS 录制验收。第三方测试模组可放到独立的 `run26_3/mods`；不打包进发布 JAR。
 
 代码遵循上游 MIT 许可证；保留原作者署名和 MinHook 许可证。

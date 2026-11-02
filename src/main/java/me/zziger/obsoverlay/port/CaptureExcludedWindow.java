@@ -30,6 +30,10 @@ public final class CaptureExcludedWindow implements AutoCloseable {
         boolean SetLayeredWindowAttributes(Pointer window,int key,byte alpha,int flags);
         Pointer GetDC(Pointer window);
         int ReleaseDC(Pointer window,Pointer dc);
+        Pointer BeginPaint(Pointer window,Paint paint);
+        boolean EndPaint(Pointer window,Paint paint);
+        boolean InvalidateRect(Pointer window,Pointer rect,boolean erase);
+        boolean UpdateWindow(Pointer window);
         boolean PeekMessageW(Message message,Pointer window,int min,int max,int flags);
         boolean TranslateMessage(Message message);
         long DispatchMessageW(Message message);
@@ -49,11 +53,17 @@ public final class CaptureExcludedWindow implements AutoCloseable {
         Pointer SelectObject(Pointer dc,Pointer object);
         boolean DeleteObject(Pointer object);
         boolean BitBlt(Pointer target,int x,int y,int width,int height,Pointer source,int sourceX,int sourceY,int operation);
+        int GetPixel(Pointer dc,int x,int y);
+        boolean GdiFlush();
     }
     @Structure.FieldOrder({"left","top","right","bottom"})
     public static class Rect extends Structure { public int left,top,right,bottom; }
     @Structure.FieldOrder({"x","y"})
     public static class Point extends Structure { public int x,y; }
+    @Structure.FieldOrder({"dc","erase","rect","restore","incremental","reserved"})
+    public static class Paint extends Structure {
+        public Pointer dc; public int erase; public Rect rect=new Rect(); public int restore,incremental; public byte[] reserved=new byte[32];
+    }
     @Structure.FieldOrder({"size","width","height","planes","bits","compression","imageSize","xDensity","yDensity","used","important"})
     public static class BitmapHeader extends Structure {
         public int size=40,width,height;
@@ -68,7 +78,8 @@ public final class CaptureExcludedWindow implements AutoCloseable {
     private static final int EXCLUDE=0x11;
     private static final int STYLES=0x00080000|0x20|0x08000000|0x80;
     private final Pointer owner;
-    private final WindowProcedure procedure=(h,m,w,l)->User.API.DefWindowProcW(h,m,w,l);
+    private final java.util.function.BooleanSupplier ownerActive;
+    private final WindowProcedure procedure=this::windowMessage;
     private final AtomicReference<Frame> pending=new AtomicReference<>();
     private final CountDownLatch initialized=new CountDownLatch(1);
     private final Thread worker;
@@ -77,15 +88,21 @@ public final class CaptureExcludedWindow implements AutoCloseable {
     private volatile long generation;
     private volatile Throwable failure;
     private volatile long copiedFrames;
+    private volatile long paintedFrames;
     // The following resources belong exclusively to the window thread.
     private Pointer dc,bitmap,previousBitmap,pixels;
     private int bitmapWidth,bitmapHeight;
     private Frame displayed;
     private boolean visible;
+    private int presentedX,presentedY,presentedWidth,presentedHeight;
 
     public CaptureExcludedWindow(long ownerHandle) {
+        this(ownerHandle,null);
+    }
+    CaptureExcludedWindow(long ownerHandle,java.util.function.BooleanSupplier activity) {
         if(!System.getProperty("os.name").startsWith("Windows") || Native.POINTER_SIZE!=8) throw new IllegalStateException("Vulkan local window requires Windows x64");
         owner=new Pointer(ownerHandle);
+        ownerActive=activity!=null?activity:()->owner.equals(User.API.GetForegroundWindow());
         var process=new IntByReference();
         if(ownerHandle==0 || User.API.GetWindowThreadProcessId(owner,process)==0 || process.getValue()!=ProcessHandle.current().pid()) throw new IllegalStateException("Invalid game window owner");
         worker=Thread.ofPlatform().daemon(true).name("OBS local-only Win32 presentation").unstarted(this::run);
@@ -140,6 +157,27 @@ public final class CaptureExcludedWindow implements AutoCloseable {
     }
     public boolean isAvailable() { return !closed && failure==null && handle!=null; }
     public long copiedFrames() { return copiedFrames; }
+    public long paintedFrames() { return paintedFrames; }
+    private long windowMessage(Pointer window,int message,long wParam,long lParam) {
+        if(message==0x0014) return 1; // WM_ERASEBKGND: retain the last complete frame.
+        if(message==0x000F) { // WM_PAINT: also repaint after expose, restore and DWM invalidation.
+            var paint=new Paint(); Pointer destination=User.API.BeginPaint(window,paint);
+            try {
+                if(destination==null) throw new IllegalStateException("Local paint DC unavailable");
+                if(destination!=null && dc!=null && bitmap!=null && displayed!=null) {
+                    if(!Gdi.API.BitBlt(destination,0,0,bitmapWidth,bitmapHeight,dc,0,0,0x00CC0020)) throw new IllegalStateException("Local image repaint failed: "+Native.getLastError());
+                    Gdi.API.GdiFlush(); paintedFrames++;
+                }
+            } catch(Throwable error) {
+                // Never throw across the native WNDPROC callback. The render thread sees
+                // isAvailable=false and resumes unfiltered rendering on the next frame.
+                failure=error; closed=true; User.API.ShowWindow(window,0);
+                OBSOverlay.LOGGER.error("Vulkan local repaint failed; filtering disabled",error);
+            } finally { User.API.EndPaint(window,paint); }
+            return 0;
+        }
+        return User.API.DefWindowProcW(window,message,wParam,lParam);
+    }
     public int captureAffinity() {
         var value=new IntByReference();
         return handle!=null && User.API.GetWindowDisplayAffinity(handle,value)?value.getValue():0;
@@ -160,26 +198,37 @@ public final class CaptureExcludedWindow implements AutoCloseable {
     }
     private void refresh() {
         if(closed) return;
+        boolean newImage=false;
         Frame next=pending.getAndSet(null);
         if(next!=null && requested && next.generation==generation) {
             allocate(next.width,next.height);
+            // BitBlt is batched. Complete previous GDI reads before the CPU overwrites
+            // the DIB; otherwise the display can consume a partial/black frame.
+            Gdi.API.GdiFlush();
             // ARGB ints on little-endian Windows are the BGRA layout required by the DIB.
             pixels.write(0,next.pixels,0,next.pixels.length);
             copiedFrames++;
             displayed=next;
+            newImage=true;
         }
         if(!requested || displayed==null || displayed.generation!=generation || System.nanoTime()-displayed.time>250_000_000L
-                || User.API.IsIconic(owner) || !User.API.IsWindowVisible(owner) || !owner.equals(User.API.GetForegroundWindow())) { conceal(); return; }
+                || User.API.IsIconic(owner) || !User.API.IsWindowVisible(owner) || !ownerActive.getAsBoolean()) { conceal(); return; }
         var rect=new Rect(); var origin=new Point();
         if(!User.API.GetClientRect(owner,rect) || !User.API.ClientToScreen(owner,origin)) { conceal(); return; }
         // Do not present an old-sized frame during a resize or DPI transition.
         if(rect.right-rect.left!=bitmapWidth || rect.bottom-rect.top!=bitmapHeight) { conceal(); return; }
-        User.API.SetWindowPos(handle,new Pointer(-1),origin.x,origin.y,bitmapWidth,bitmapHeight,0x0010|0x0040);
-        Pointer destination=User.API.GetDC(handle);
-        if(destination==null) throw new IllegalStateException("Local image DC unavailable");
-        try {
-            if(!Gdi.API.BitBlt(destination,0,0,bitmapWidth,bitmapHeight,dc,0,0,0x00CC0020)) throw new IllegalStateException("Local image upload failed: "+Native.getLastError());
-        } finally { User.API.ReleaseDC(handle,destination); }
+        boolean geometryChanged=!visible || origin.x!=presentedX || origin.y!=presentedY || bitmapWidth!=presentedWidth || bitmapHeight!=presentedHeight;
+        // Repeatedly resizing a protected layered surface can invalidate DWM's contents.
+        // Move/resize only when geometry actually changes, and redraw retained pixels.
+        if(geometryChanged) {
+            if(!User.API.SetWindowPos(handle,new Pointer(-1),origin.x,origin.y,bitmapWidth,bitmapHeight,0x0010|0x0040)) throw new IllegalStateException("Local window positioning failed: "+Native.getLastError());
+            presentedX=origin.x; presentedY=origin.y; presentedWidth=bitmapWidth; presentedHeight=bitmapHeight;
+        }
+        if(!newImage && !geometryChanged) return;
+        long previouslyPainted=paintedFrames;
+        User.API.InvalidateRect(handle,null,false);
+        User.API.UpdateWindow(handle);
+        if(paintedFrames==previouslyPainted) throw new IllegalStateException("Local window did not repaint; disabling filtering to keep the game visible");
         visible=true;
     }
     private void conceal() { if(visible && handle!=null) { User.API.ShowWindow(handle,0); visible=false; } }
@@ -195,6 +244,7 @@ public final class CaptureExcludedWindow implements AutoCloseable {
     }
     private void releaseBitmap() {
         if(bitmap!=null) {
+            Gdi.API.GdiFlush();
             if(dc!=null && previousBitmap!=null) Gdi.API.SelectObject(dc,previousBitmap);
             Gdi.API.DeleteObject(bitmap); bitmap=null; pixels=null; previousBitmap=null;
         }

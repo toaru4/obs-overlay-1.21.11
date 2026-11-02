@@ -83,7 +83,7 @@ public final class OverlayRenderer implements AutoCloseable {
     }
     public void hideLocalPresentation() { if(vulkan!=null) vulkan.hide(); }
     public String presentationDescription() {
-        return vulkan!=null?"Vulkan: experimental / windowed or borderless / 30 FPS":compositor!=null?"OpenGL: native composition":"Presentation not initialized";
+        return vulkan!=null?(vulkan.ready()?"Vulkan: experimental / windowed or borderless / 30 FPS":"Vulkan presentation unavailable; filtering disabled"):compositor!=null?"OpenGL: native composition":"Presentation not initialized";
     }
     private GuiRenderer createLocalGuiRenderer() {
         var client=Minecraft.getInstance();

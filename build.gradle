@@ -28,6 +28,7 @@ jar { from('LICENSE', 'MINHOOK-LICENSE.txt') }
 sourceSets {
     smoke {
         java.setSrcDirs(['src/smoke26/java'])
+        resources.setSrcDirs(['src/smoke26/resources'])
         compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
         runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
     }
@@ -45,6 +46,12 @@ loom {
             if (project.hasProperty('glSmoke')) vmArg '-Dobs.overlay.glSmoke=true'
             if (project.hasProperty('desktopSmoke')) vmArg '-Dobs.overlay.desktopSmoke=true'
             if (project.hasProperty('vkSmoke')) vmArg '-Dobs.overlay.vkSmoke=true'
+            if (project.hasProperty('visibleSmoke')) vmArg '-Dobs.overlay.visibleSmoke=true'
+            if (project.hasProperty('gameSmoke')) {
+                vmArg '-Dobs.overlay.gameSmoke=true'
+                vmArg '-Xmx2G'
+                vmArg '-Djava.awt.headless=true'
+            }
         }
     }
     mods {
