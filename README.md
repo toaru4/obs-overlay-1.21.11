@@ -1,8 +1,12 @@
 # OBS Overlay — Minecraft 26.3（实验性适配）
 
-基于 [zziger/obs-overlay](https://github.com/zziger/obs-overlay)（MIT），面向无规则服务器使用场景的 Fabric / Windows x64 移植。当前分支为 `port/minecraft-26.3`，版本 `4.0.0-alpha.1+26.3`。
+基于 [zziger/obs-overlay](https://github.com/zziger/obs-overlay)（MIT），面向无规则服务器使用场景的 Fabric / Windows x64 移植。当前分支为 `port/minecraft-26.3`，版本 `4.0.0-alpha.2+26.3`。
 
 选中的 HUD、GUI 仅在本地显示，目标是在 OBS 游戏采集中排除。**目前已通过构建、Mixin、真实 GPU 隔离测试，尚未完成真实游戏与 OBS 的录制验收，请勿用于未经预览检查的正式直播。**
+
+## alpha.2 热修复
+
+修复启动主菜单时 `Texture view does not exist` 崩溃：本地 GUI 渲染器复用原版全景背景纹理，不再重复注册并替换资源重载管理的纹理。替换 alpha.1 JAR 即可，配置文件保留。已用真实 Vulkan GPU 复现旧异常并验证纹理生命周期；尚未宣称完成整个整合包的启动或 OBS 验收。
 
 ## 两种渲染后端
 
@@ -16,7 +20,7 @@ Vulkan 窗口采用 GDI 软件绘制，没有额外的图形交换链；启用 `
 ## 安装与设置
 
 1. Minecraft **26.3**、Java **25**、Fabric Loader **0.19.5 或更新版本**，以及对应版本 Fabric API。
-2. 放入 `obs-overlay-fabric-4.0.0-alpha.1+26.3.jar`。不要与 1.21.11 版同时安装。
+2. 放入 `obs-overlay-fabric-4.0.0-alpha.2+26.3.jar`。不要与 1.21.11 版同时安装。
 3. 打开 **选项 → 视频设置 → OBS Overlay 设置**；Mod Menu 可选。
 4. 分别设置 Meteor、RusherHack、Xaero、MaLiLib 的 HUD / GUI 开关。开启表示仅本地显示；关闭表示正常录制。模组开关默认关闭。
 5. OBS 使用游戏采集，关闭采集源的「采集第三方叠加层」。打开「录制测试标记」，确认本地有 `OBS LOCAL ONLY`，OBS 预览没有。

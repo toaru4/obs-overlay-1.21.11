@@ -104,7 +104,9 @@ public final class OverlayRenderer implements AutoCloseable {
                     .newInstance(state,client.gameRenderer.featureRenderDispatcher(),pictures);
             } catch(ReflectiveOperationException e) { throw new IllegalStateException("Unsupported Meteor GUI renderer",e); }
         } else result=new GuiRenderer(state,client.gameRenderer.featureRenderDispatcher(),pictures);
-        result.registerPanoramaTextures(client.getTextureManager());
+        // Panorama textures belong to Minecraft's resource reload lifecycle. A second
+        // registration replaces and closes the shared texture without loading its replacement.
+        // CubeMap.render looks it up by the same identifier, so the local renderer reuses it.
         return result;
     }
     public void renderGui() {

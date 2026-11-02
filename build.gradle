@@ -64,7 +64,7 @@ tasks.register('policyTest', JavaExec) {
     mainClass = 'me.zziger.obsoverlay.port.PolicyTest'
 }
 check.dependsOn policyTest
-['RenderPassContractTest', 'RenderTargetRouterTest'].each { contract ->
+['RenderPassContractTest', 'RenderTargetRouterTest', 'TextureOwnershipTest'].each { contract ->
     def verification = tasks.register(contract, JavaExec) {
         dependsOn testClasses
         classpath = sourceSets.test.runtimeClasspath

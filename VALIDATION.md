@@ -1,6 +1,13 @@
-# Validation — 4.0.0-alpha.1+26.3
+# Validation — 4.0.0-alpha.2+26.3
 
 Environment: Windows x64, Java 25, Gradle 9.8.0, Loom 1.19.3, Fabric Loader 0.19.5, Fabric API 0.165.0+26.3. Official unobfuscated Minecraft 26.3 client.
+
+## alpha.2 regression verification
+
+- Fixed the reported startup exception: the local renderer no longer re-registers Minecraft-owned panorama textures. The removed call replaced/closed the existing shared texture with an unloaded CubeMapTexture.
+- `TextureOwnershipTest`, included in Gradle check, rejects registration/replacement/release of Minecraft-owned textures from production overlay bytecode; its negative control detects the offending alpha.1 call.
+- `PANORAMA_OWNERSHIP_PASS` on real RenderPearl Vulkan: existing texture and view survive two local GuiRenderer creations and closures. Repeating the removed registration reproduces the exact uninitialized texture-view exception. This exercises real TextureManager, GuiRenderer and GPU resources, not a complete game/menu launch.
+- `build runSmoke -PvkSmoke -PdesktopSmoke -x downloadAssets --offline` passed, including the Vulkan readback, Mixin and queue tests.
 
 ## Passed
 

@@ -25,6 +25,7 @@ public final class VulkanReadbackSmoke {
         var local=new TextureTarget("local",8,8,GpuFormat.RGBA8_UNORM,GpuFormat.D32_FLOAT);
         var completed=new AtomicInteger();
         try {
+            PanoramaOwnershipSmoke.run();
             var encoder=device.createCommandEncoder();
             encoder.clearColorAndDepthTextures(captured.getColorTexture(),new Vector4f(1,0,0,1),captured.getDepthTexture(),0);
             local.copyColorFrom(captured);
