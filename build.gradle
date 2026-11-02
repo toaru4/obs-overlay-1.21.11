@@ -9,8 +9,10 @@ if (project.hasProperty('glSmoke') && project.hasProperty('vkSmoke')) {
 version = project.mod_version
 base { archivesName = 'obs-overlay-fabric' }
 repositories {
-    maven { url 'https://maven.terraformersmc.com/releases' }
-    maven { url 'https://api.modrinth.com/maven' }
+    maven {
+        url 'https://api.modrinth.com/maven'
+        content { includeGroup 'maven.modrinth' }
+    }
 }
 dependencies {
  minecraft "com.mojang:minecraft:${project.minecraft_version}"
