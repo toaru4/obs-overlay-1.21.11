@@ -1,19 +1,20 @@
 package me.zziger.obsoverlay.port;
 
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.GpuFormat;
+import org.joml.Vector4f;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.Framebuffer;
-import net.minecraft.client.gl.SimpleFramebuffer;
+import net.minecraft.client.Minecraft;
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.pipeline.TextureTarget;
 import net.minecraft.client.gui.render.GuiRenderer;
-import net.minecraft.client.gui.render.state.GuiRenderState;
-import net.minecraft.client.texture.GlTexture;
+import net.minecraft.client.renderer.state.gui.GuiRenderState;
+import com.mojang.renderpearl.backend.opengl.GlTexture;
 import me.zziger.obsoverlay.port.mixin.GuiRendererAccessor;
 
 public final class OverlayRenderer implements AutoCloseable {
     public final GuiRenderState state = new GuiRenderState();
-    private Framebuffer framebuffer;
-    private Framebuffer localScene;
+    private RenderTarget framebuffer;
+    private RenderTarget localScene;
     private boolean sceneActive;
     private final LocalCompositor compositor;
     private boolean dirty;
@@ -26,11 +27,11 @@ public final class OverlayRenderer implements AutoCloseable {
         OBSOverlay.LOGGER.info("OBS Overlay 1.21.11 native overlay initialized");
     }
     public boolean ready() { return active && framebuffer != null; }
-    public Framebuffer framebuffer() { return framebuffer; }
-    public Framebuffer localScene() { return sceneActive ? localScene : null; }
-    public boolean mirrorScreen(Framebuffer target) {
+    public RenderTarget framebuffer() { return framebuffer; }
+    public RenderTarget localScene() { return sceneActive ? localScene : null; }
+    public boolean mirrorScreen(RenderTarget target) {
         return ready() && sceneActive && !RenderRouter.renderingOverlay
-                && target != null && RenderRouter.isScreenTarget(target.getColorAttachment());
+                && target != null && RenderRouter.isScreenTarget(target.getColorTexture());
     }
     public void markDirty() { dirty = true; }
     public void beginFrame() {
@@ -40,60 +41,54 @@ public final class OverlayRenderer implements AutoCloseable {
         RenderRouter.screenOverlay = false;
         RenderRouter.renderingOverlay = false;
         RenderRouter.vanillaScope = 0;
-        var window = MinecraftClient.getInstance().getWindow();
-        int width = window.getFramebufferWidth(), height = window.getFramebufferHeight();
+        var window = Minecraft.getInstance().getWindow();
+        int width = window.getWidth(), height = window.getHeight();
         active = width > 0 && height > 0;
         if (!active) return;
-        if (framebuffer == null) framebuffer = new SimpleFramebuffer("OBS local-only overlay", width, height, true);
-        else if (framebuffer.textureWidth != width || framebuffer.textureHeight != height) framebuffer.resize(width, height);
-        RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(framebuffer.getColorAttachment(), 0, framebuffer.getDepthAttachment(), 1.0);
-        state.clear();
+        if (framebuffer == null) framebuffer = new TextureTarget("OBS local-only overlay", width, height, RenderRouter.mainColorTexture.getFormat(), GpuFormat.D32_FLOAT);
+        else if (framebuffer.width != width || framebuffer.height != height) framebuffer.resize(width, height);
+        RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(framebuffer.getColorTexture(), new Vector4f(), framebuffer.getDepthTexture(), 1.0);
+        state.reset();
         dirty = false;
         testIconDrawn = false;
     }
     /** Called after HUD submission, before extracting the first screen. Never writes the captured color. */
     public void beginScreenScene() {
         if (!ready() || sceneActive) return;
-        int width = framebuffer.textureWidth, height = framebuffer.textureHeight;
-        if (localScene == null) localScene = new SimpleFramebuffer("OBS complete local scene", width, height, true);
-        else if (localScene.textureWidth != width || localScene.textureHeight != height) localScene.resize(width, height);
-        compositor.drawToTexture(((GlTexture)RenderRouter.mainColorTexture).getGlId(),
-                ((GlTexture)localScene.getColorAttachment()).getGlId(), width, height, true);
+        int width = framebuffer.width, height = framebuffer.height;
+        if (localScene == null) localScene = new TextureTarget("OBS complete local scene", width, height, RenderRouter.mainColorTexture.getFormat(), GpuFormat.D32_FLOAT);
+        else if (localScene.width != width || localScene.height != height) localScene.resize(width, height);
+        localScene.copyColorFrom(Minecraft.getInstance().gameRenderer.mainRenderTarget());
         sceneActive = true;
         mergeOverlay();
         // The screen starts a new submission, so its depth must not collide with the flushed HUD.
         var encoder = RenderSystem.getDevice().createCommandEncoder();
         encoder.clearDepthTexture(RenderRouter.mainDepthTexture, 1.0);
-        encoder.clearDepthTexture(localScene.getDepthAttachment(), 1.0);
+        encoder.clearDepthTexture(localScene.getDepthTexture(), 1.0);
     }
     private void mergeOverlay() {
         if (!sceneActive || !dirty) return;
-        compositor.drawToTexture(((GlTexture)framebuffer.getColorAttachment()).getGlId(),
-                ((GlTexture)localScene.getColorAttachment()).getGlId(), framebuffer.textureWidth, framebuffer.textureHeight, false);
-        RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(framebuffer.getColorAttachment(), 0, framebuffer.getDepthAttachment(), 1.0);
+        framebuffer.blitAndBlendToTexture(localScene.getColorTextureView(), localScene.getDepthTextureView());
+        RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(framebuffer.getColorTexture(), new Vector4f(), framebuffer.getDepthTexture(), 1.0);
         dirty = false;
     }
-    public void renderGui(GuiRenderer renderer, GpuBufferSlice fog) {
+    public void renderGui(GuiRenderer renderer) {
         if (ready() && OBSOverlay.config.showTestIcon && !testIconDrawn) {
-            var client = MinecraftClient.getInstance();
-            var context = new net.minecraft.client.gui.DrawContext(client, state, 0, 0);
+            var client = Minecraft.getInstance();
+            var context = new net.minecraft.client.gui.GuiGraphicsExtractor(client, state, 0, 0);
             context.fill(4, 4, 112, 20, 0xE0008800);
-            context.drawTextWithShadow(client.textRenderer, "OBS LOCAL ONLY", 8, 8, 0xFFFFFFFF);
+            context.text(client.font, "OBS LOCAL ONLY", 8, 8, 0xFFFFFFFF);
             dirty = true;
             testIconDrawn = true;
         }
         if (!ready() || !dirty) return;
         GuiRendererAccessor access = (GuiRendererAccessor) renderer;
         GuiRenderState original = access.obs$getState();
-        var oldColor = RenderSystem.outputColorTextureOverride;
-        var oldDepth = RenderSystem.outputDepthTextureOverride;
         try {
             RenderRouter.renderingOverlay = true;
             access.obs$setState(state);
-            renderer.render(fog);
+            renderer.render();
         } finally {
-            RenderSystem.outputColorTextureOverride = oldColor;
-            RenderSystem.outputDepthTextureOverride = oldDepth;
             access.obs$setState(original);
             RenderRouter.renderingOverlay = false;
         }
@@ -103,14 +98,14 @@ public final class OverlayRenderer implements AutoCloseable {
         if (!ready()) return;
         if (sceneActive) {
             mergeOverlay();
-            compositor.draw(((GlTexture)localScene.getColorAttachment()).getGlId(), localScene.textureWidth, localScene.textureHeight, true);
-        } else if (dirty && framebuffer.getColorAttachment() instanceof GlTexture texture) compositor.draw(texture.getGlId(), framebuffer.textureWidth, framebuffer.textureHeight);
+            compositor.draw(((GlTexture)localScene.getColorTexture()).glId(), localScene.width, localScene.height, true);
+        } else if (dirty && framebuffer.getColorTexture() instanceof GlTexture texture) compositor.draw(texture.glId(), framebuffer.width, framebuffer.height);
     }
     @Override public void close() {
         active = false;
         NativeSwapHook.uninstall();
-        if (framebuffer != null) framebuffer.delete();
-        if (localScene != null) localScene.delete();
+        if (framebuffer != null) framebuffer.destroyBuffers();
+        if (localScene != null) localScene.destroyBuffers();
         compositor.close();
     }
 }
