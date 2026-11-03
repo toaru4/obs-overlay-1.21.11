@@ -3,7 +3,17 @@ import net.fabricmc.loader.api.entrypoint.PreLaunchEntrypoint;
 public final class MixinSmoke implements PreLaunchEntrypoint {
     @Override public void onPreLaunch() {
         try {
-            if(Boolean.getBoolean("obs.overlay.gameSmoke")) { System.out.println("GAME_SMOKE_START: isolated automatic menu/world rendering test"); return; }
+            if(Boolean.getBoolean("obs.overlay.gameSmoke")) {
+                if(Boolean.getBoolean("obs.overlay.sodiumCompatSmoke")) {
+                    var loader=net.fabricmc.loader.api.FabricLoader.getInstance();
+                    String sodium=loader.getModContainer("sodium").orElseThrow().getMetadata().getVersion().getFriendlyString();
+                    var meteor=loader.getModContainer("meteor-client").orElseThrow().getMetadata();
+                    if(!sodium.equals("0.9.3-beta.1+mc26.3") || meteor.getCustomValue("obs-overlay:sodium-compat")==null)
+                        throw new AssertionError("Sodium compatibility test requires beta.1 and patched Meteor, actual Sodium="+sodium);
+                    System.out.println("SODIUM_COMPAT_TARGET: "+sodium+"; "+meteor.getName());
+                }
+                System.out.println("GAME_SMOKE_START: isolated automatic menu/world rendering test"); return;
+            }
             String[] types={"net.minecraft.client.Minecraft","net.minecraft.client.renderer.GameRenderer",
                 "net.minecraft.client.gui.Gui","net.minecraft.client.gui.Hud","net.minecraft.client.gui.render.GuiRenderer",
                 "net.minecraft.client.renderer.state.gui.GuiRenderState","com.mojang.renderpearl.frontend.FrontendCommandEncoder",

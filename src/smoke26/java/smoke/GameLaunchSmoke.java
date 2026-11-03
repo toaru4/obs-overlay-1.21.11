@@ -44,9 +44,41 @@ public final class GameLaunchSmoke {
                 capture("world"); stage=4; return;
             }
             if(stage==4 && completed.get()==4) {
+                if(Boolean.getBoolean("obs.overlay.sodiumCompatSmoke")) {
+                    stage=5; frames=0; mc.execute(GameLaunchSmoke::enableXray); return;
+                }
                 System.out.println("GAME_RENDER_PASS: full client menu and integrated world rendered with independent local/capture screenshots; no live OBS acceptance");
-                stage=5; mc.execute(mc::stop);
+                stage=7; mc.execute(mc::stop);
             }
+            if(stage==5 && ++frames>180) {
+                capture("xray-water-lava"); stage=6; return;
+            }
+            if(stage==6 && completed.get()==6) {
+                mc.execute(()-> {
+                    try { xrayModule.getClass().getMethod("toggle").invoke(xrayModule); }
+                    catch(Exception e) { throw new RuntimeException(e); }
+                    System.out.println("SODIUM_093_GAME_PASS: integrated world, water/lava, Xray enabled with nonzero fluid alpha, capture/local screenshots, clean shutdown");
+                    mc.stop();
+                });
+                stage=7;
+            }
+        } catch(Throwable e) { e.printStackTrace(); System.exit(1); }
+    }
+    static Object xrayModule;
+    static void enableXray() {
+        try {
+            var modules=Class.forName("meteordevelopment.meteorclient.systems.modules.Modules");
+            var type=Class.forName("meteordevelopment.meteorclient.systems.modules.render.Xray");
+            xrayModule=modules.getMethod("get",Class.class).invoke(modules.getMethod("get").invoke(null),type);
+            Object opacity=type.getField("opacity").get(xrayModule);
+            opacity.getClass().getMethod("set",Object.class).invoke(opacity,64);
+            if(!(Boolean)type.getMethod("isActive").invoke(xrayModule)) type.getMethod("toggle").invoke(xrayModule);
+            for(var fluid:new net.minecraft.world.level.material.Fluid[]{net.minecraft.world.level.material.Fluids.WATER,net.minecraft.world.level.material.Fluids.LAVA}) {
+                int alpha=(Integer)type.getMethod("getFluidAlpha",net.minecraft.world.level.material.FluidState.class,net.minecraft.core.BlockPos.class)
+                    .invoke(null,fluid.defaultFluidState(),Minecraft.getInstance().player.blockPosition());
+                if(alpha!=64) throw new AssertionError("Xray fluid path bypassed: "+alpha);
+            }
+            System.out.println("XRAY_ACTIVE: water and lava alpha=64; fluid rendering enabled");
         } catch(Throwable e) { e.printStackTrace(); System.exit(1); }
     }
     static void capture(String name) throws Exception {

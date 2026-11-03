@@ -2,11 +2,20 @@
 
 Environment: Windows x64, Java 25, Gradle 9.8.0, Loom 1.19.3, Fabric Loader 0.20.1, Fabric API 0.165.0+26.3. Official unobfuscated Minecraft 26.3 client.
 
+## Meteor Sodium Compat 1
+
+- Exact target: Meteor 26.3-15, commit e3a2e77967629d216e127b5ceecf71fb15f9d2e5, with Sodium 0.9.3-beta.1+mc26.3.
+- Unpatched baseline reproduces InvalidInjectionException for the old isFluidSideExposed signature. Patched class passes real Sodium/Meteor Mixin transformation and JVM verification; the Sodium 0.9.2 fallback branch also passes.
+- Remove return-site @Local capture from the full-block fluid handler and derive the neighbor from arguments; add the new world/block-position exposure signature. A grouped selector requires a real injection on the applicable Sodium API. Xray and fluid material/alpha code retained.
+- Actual Vulkan and OpenGL full-client integrated worlds passed, with water/lava and Xray active at fluid alpha 64. Local/captured screenshots saved and clean shutdown verified.
+- Patcher verifies the original class SHA256 and verifies only one bytecode class and provenance metadata differ. Original licenses/nested dependencies preserved. Changed source embedded in JAR; full corresponding upstream source plus modifications supplied as a separate archive.
+- These results address the reported Meteor/Sodium fluid-renderer conflict. They do not establish compatibility with other Meteor builds, every addon/shader, or physical OBS capture.
+
 ## alpha.3 validation
 
 - Local native presentation now uses retained-frame WM_PAINT, BeginPaint/EndPaint, GdiFlush around shared bitmap access, and geometry updates only on actual changes. Native callback failures hide the window and disable filtering.
 - Visible synthetic-window test passed: protected window DC contains green pixels; desktop capture sees the blue owner while exclusion is enabled; with exclusion temporarily disabled for synthetic pixels, green/red desktop pixels, invalidation repaint, physical resize and hide were verified. No user game pixels were exposed by this test.
-- Real DefaultFluidRenderer class transformation and JVM verification passed with official Sodium 0.9.2+mc26.3 and Meteor 26.3-15. Sodium 0.9.3-beta.1 is excluded from supported combinations because of the upstream Meteor integration failure; no Meteor binary patch or automatic disabling of its Xray was used.
+- Real DefaultFluidRenderer class transformation and JVM verification passed with official Sodium 0.9.2+mc26.3 and Meteor 26.3-15. This was the original-Meteor baseline. The separate Meteor Sodium Compat 1 patch above now supports beta.1 without disabling Xray.
 - Full client menu and temporary integrated world tested with Meteor 26.3-15, Sodium 0.9.2, Singularity 23, ImmediatelyFast 1.17.1, Fabric API 0.165.0 and Loader 0.20.1 on Intel Iris Xe / Vulkan. The test placed water/lava and saved capture/local screenshots. The marker is disabled for the world check. An OpenGL menu/world baseline with Meteor + Sodium 0.9.2 also passed before the Windows presentation changes.
 - Repeated the full Vulkan menu/world test without Sodium (Meteor + Singularity + ImmediatelyFast); it also passed with nonblack local and capture frames.
 - Full build, policy, resource ownership, Mixin, native window and real Vulkan readback tests passed.

@@ -26,6 +26,10 @@ processResources { inputs.property 'version', project.version; filesMatching('fa
 jar { from('LICENSE', 'MINHOOK-LICENSE.txt') }
 
 sourceSets {
+    meteorCompat {
+        java.setSrcDirs(['compat/meteor/src'])
+        compileClasspath += sourceSets.main.compileClasspath
+    }
     smoke {
         java.setSrcDirs(['src/smoke26/java'])
         resources.setSrcDirs(['src/smoke26/resources'])
@@ -35,6 +39,27 @@ sourceSets {
 }
 configurations { smokeImplementation.extendsFrom implementation }
 dependencies { smokeImplementation sourceSets.main.output }
+dependencies {
+    if (project.hasProperty('meteorCompatJar')) meteorCompatCompileOnly files(project.property('meteorCompatJar'))
+    if (project.hasProperty('sodiumCompatJar')) meteorCompatCompileOnly files(project.property('sodiumCompatJar'))
+}
+tasks.named('compileMeteorCompatJava') {
+    doFirst {
+        ['meteorCompatJar','sodiumCompatJar'].each { key ->
+            if (!project.hasProperty(key) || !file(project.property(key)).isFile()) throw new GradleException("Provide -P${key}=path/to/original.jar")
+        }
+    }
+}
+tasks.register('patchMeteorSodium', Exec) {
+    dependsOn compileMeteorCompatJava
+    doFirst {
+        commandLine project.findProperty('compatPython') ?: 'python',
+            file('compat/meteor/patch.py').absolutePath,
+            file(project.property('meteorCompatJar')).absolutePath,
+            layout.buildDirectory.file('classes/java/meteorCompat/meteordevelopment/meteorclient/mixin/sodium/SodiumDefaultFluidRendererMixin.class').get().asFile.absolutePath,
+            layout.buildDirectory.file('compat/meteor-client-26.3-15-sodium093-compat1.jar').get().asFile.absolutePath
+    }
+}
 loom {
     runs {
         smoke {
@@ -47,6 +72,7 @@ loom {
             if (project.hasProperty('desktopSmoke')) vmArg '-Dobs.overlay.desktopSmoke=true'
             if (project.hasProperty('vkSmoke')) vmArg '-Dobs.overlay.vkSmoke=true'
             if (project.hasProperty('visibleSmoke')) vmArg '-Dobs.overlay.visibleSmoke=true'
+            if (project.hasProperty('sodiumCompatSmoke')) vmArg '-Dobs.overlay.sodiumCompatSmoke=true'
             if (project.hasProperty('gameSmoke')) {
                 vmArg '-Dobs.overlay.gameSmoke=true'
                 vmArg '-Xmx2G'

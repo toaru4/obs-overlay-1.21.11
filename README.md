@@ -4,11 +4,19 @@
 
 选中的 HUD、GUI 仅在本地显示，目标是在 OBS 游戏采集中排除。**目前已通过构建、Mixin、真实 GPU 隔离和本地世界渲染测试，尚未完成实际 OBS 录制验收，请勿用于未经预览检查的正式直播。**
 
+## Meteor + Sodium 0.9.3-beta.1：兼容补丁
+
+新增 **Meteor 26.3-15 Sodium Compat 1**：修复旧版流体方法签名和返回点局部变量捕获，支持与 Sodium **0.9.3-beta.1+mc26.3** 共存。保留 Xray、流体透明度和材质逻辑；这不是降级 Sodium 或禁用 Xray 的规避。
+
+该修复位于 Meteor 的注入类，需要用兼容补丁 JAR 替换原版 Meteor，OBS Overlay alpha.3 不需要替换。修改后的源码、严格校验原始版本的构建工具、GPLv3 许可证和安装步骤见 [compat/meteor](compat/meteor/README.md)。编译产物仅改一个类及来源元数据；原依赖和许可证保留。兼容补丁名称在 Mod Menu 中可见。
+
+已用原版 Meteor + Sodium beta.1 复现失败，并验证补丁版的类转换、JVM 校验、完整本地世界和 Xray 开启（流体 alpha=64）的水/岩浆渲染。旧 Sodium 0.9.2 分支也通过类转换回归。实际测试记录见 VALIDATION.md。
+
 ## alpha.3：本地黑屏修复与 Sodium 组合
 
 - 本地窗口改用 `WM_PAINT` 保留帧重绘，补上 CPU / GDI 位图读写同步；仅在位置或尺寸改变时重设窗口，避免反复使受保护的窗口内容失效。
 - 无法重绘时隐藏本地窗口并停用过滤，设置页显示停用状态，避免留下遮住游戏的空白窗口。
-- 已验证 **Meteor 26.3-15 + Sodium 0.9.2+mc26.3**。`0.9.3-beta.1` 与该版 Meteor 的流体注入存在上游已确认冲突，请替换为 0.9.2，不要同时放两版 Sodium。[上游说明](https://github.com/MeteorDevelopment/meteor-client/issues/6737)。
+- 原版 Meteor 26.3-15 与 Sodium 0.9.2 的组合仍可用。使用 Sodium 0.9.3-beta.1 时需要上面的 Meteor 兼容补丁；原版 Meteor 仍存在 [上游已确认的注入冲突](https://github.com/MeteorDevelopment/meteor-client/issues/6737)。
 - 本轮完成真实客户端主菜单、自动创建本地世界，以及可见窗口像素/重绘/缩放测试；Vulkan 组合加入了 Singularity 23 与 ImmediatelyFast 1.17.1。实际 OBS 录制和用户报告的间歇黑屏仍需在原使用场景复测，不能仅凭测试断言所有显示问题消失。
 
 ## alpha.2 热修复
@@ -56,4 +64,4 @@ Vulkan 窗口采用 GDI 软件绘制，没有额外的图形交换链；启用 `
 
 后两项需要 Windows x64 与相应显卡支持。`-PvisibleSmoke` 会短暂显示一个不抢焦点的纯色窗口，验证重绘和缩放；`-PgameSmoke` 会在 `run26_3` 中启动完整客户端并创建独立测试世界，需要已下载的游戏资源，不能和 GPU 单元 smoke 标记同时使用。默认 smoke 不启动完整游戏，不应将它解释为 OBS 录制验收。第三方测试模组可放到独立的 `run26_3/mods`；不打包进发布 JAR。
 
-代码遵循上游 MIT 许可证；保留原作者署名和 MinHook 许可证。
+OBS Overlay 代码遵循上游 MIT 许可证；保留原作者署名和 MinHook 许可证。compat/meteor 中的 Meteor 衍生代码单独遵循 GPL-3.0-only。
