@@ -9,13 +9,16 @@ public final class OBSOverlay implements ClientModInitializer {
     public static OverlayConfig config;
     public static OverlayRenderer renderer;
     private static boolean failed;
-    @Override public void onInitializeClient() { config = OverlayConfig.load(); }
+    @Override public void onInitializeClient() { config = OverlayConfig.load(); renderer=new OverlayRenderer(); }
     public static void beginFrame() {
         if (failed) return;
         if (renderer == null) {
             try { renderer = new OverlayRenderer(); }
             catch (RuntimeException | LinkageError e) { failed = true; LOGGER.error("OBS Overlay initialization failed", e); return; }
         }
-        renderer.beginFrame();
+        try { renderer.beginFrame(); }
+        catch(RuntimeException | LinkageError e) {
+            failed=true; renderer.close(); LOGGER.error("OBS Overlay presentation unavailable; filtering disabled",e);
+        }
     }
 }

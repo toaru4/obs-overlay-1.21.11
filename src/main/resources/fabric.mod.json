@@ -3,16 +3,34 @@
   "id": "obs_overlay",
   "version": "${version}",
   "name": "OBS Overlay",
-  "description": "Local-only HUD and GUI overlays for OBS Game Capture on Windows. Minecraft 1.21.11 port.",
-  "authors": ["zziger", "toaru4"],
+  "description": "Experimental Minecraft 26.3 port. OpenGL native composition and Vulkan windowed readback presentation. Live OBS acceptance pending.",
+  "authors": [
+    "zziger",
+    "toaru4"
+  ],
   "license": "MIT",
   "environment": "client",
-  "contact": {"sources": "https://github.com/toaru4/obs-overlay-1.21.11"},
-  "entrypoints": {
-    "client": ["me.zziger.obsoverlay.port.OBSOverlay"],
-    "modmenu": ["me.zziger.obsoverlay.port.ModMenuIntegration"]
+  "contact": {
+    "sources": "https://github.com/toaru4/obs-overlay-1.21.11"
   },
-  "mixins": ["obs_overlay.port.mixins.json"],
-  "depends": {"fabricloader": ">=0.18.4", "minecraft": "1.21.11", "java": ">=21", "fabric-api": "*"},
-  "suggests": {"modmenu": "*"}
+  "entrypoints": {
+    "client": [
+      "me.zziger.obsoverlay.port.OBSOverlay"
+    ],
+    "modmenu": [
+      "me.zziger.obsoverlay.port.ModMenuIntegration"
+    ]
+  },
+  "mixins": [
+    "obs_overlay.port.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "26.3",
+    "java": ">=25",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "modmenu": "*"
+  }
 }

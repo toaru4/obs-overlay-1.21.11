@@ -1,4 +1,4 @@
-name: Build Minecraft 1.21.11
+name: Build Minecraft 26.3
 on:
   push:
   pull_request:
@@ -12,11 +12,11 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '25'
       - uses: gradle/actions/setup-gradle@v4
       - run: chmod +x gradlew
       - run: ./gradlew build runSmoke -x downloadAssets --no-daemon
       - uses: actions/upload-artifact@v4
         with:
-          name: obs-overlay-fabric-1.21.11
+          name: obs-overlay-fabric-26.3
           path: build/libs/*.jar

@@ -2,7 +2,21 @@
   "required": true,
   "minVersion": "0.8",
   "package": "me.zziger.obsoverlay.port.mixin",
-  "compatibilityLevel": "JAVA_21",
-  "client": ["GameRendererMixin", "MinecraftClientMixin", "GuiRenderStateMixin", "GuiRendererAccessor", "GuiRendererMixin", "GlCommandEncoderMixin", "ScreenMixin", "MeteorWidgetScreenMixin", "VideoOptionsScreenMixin", "VanillaHudMixin"],
-  "injectors": {"defaultRequire": 1}
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "GameRendererMixin",
+    "MinecraftClientMixin",
+    "GuiRenderStateMixin",
+    "GuiRendererAccessor",
+    "GuiRendererMixin",
+    "GlCommandEncoderMixin",
+    "ScreenMixin",
+    "MeteorWidgetScreenMixin",
+    "VideoOptionsScreenMixin",
+    "VanillaHudMixin",
+    "GuiExtractionMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
 }

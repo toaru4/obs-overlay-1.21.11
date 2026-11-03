@@ -1,9 +1,9 @@
 package me.zziger.obsoverlay.port;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.render.state.GuiRenderState;
-import com.mojang.blaze3d.textures.GpuTexture;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.state.gui.GuiRenderState;
+import com.mojang.renderpearl.api.textures.GpuTexture;
 
 /** Classify commands during extraction, before deferred GUI drawing loses the producer stack. */
 public final class RenderRouter {
@@ -12,6 +12,14 @@ public final class RenderRouter {
     public static boolean screen;
     public static boolean screenOverlay;
     public static boolean renderingOverlay;
+    public static boolean submittingGui;
+    public static boolean mainGuiDraw;
+    public static Boolean meteorScreenQueue;
+    public static boolean consumeMeteorQueuePolicy() {
+        Boolean gui=meteorScreenQueue;
+        meteorScreenQueue=null;
+        return gui!=null?gui:OBSOverlay.config.enabled(ModTarget.METEOR,false);
+    }
     public static int vanillaScope;
     public static ScreenScope screenScope(boolean hidden) { return new ScreenScope(hidden); }
     /** Screen renderers may run after vanilla GUI submission (e.g. Meteor renderCustom). */
@@ -26,13 +34,13 @@ public final class RenderRouter {
     // Mods also use GuiRenderState for intermediate textures with their own coordinates.
     public static GuiRenderState mainGuiState;
     public static boolean isScreenQueue(GuiRenderState state) { return state == mainGuiState; }
-    // Xaero temporarily replaces MinecraftClient.framebuffer while generating its map.
+    // Xaero temporarily replaces Minecraft.framebuffer while generating its map.
     // Snapshot the actual screen attachments before any mod starts drawing this frame.
     public static GpuTexture mainColorTexture;
     public static GpuTexture mainDepthTexture;
     public static boolean isScreenTarget(GpuTexture texture) { return texture != null && texture == mainColorTexture; }
     public static boolean hiddenScreen(Screen value) {
-        return value != null && hiddenScreenType(value.getClass(), MinecraftClient.getInstance().world != null);
+        return value != null && hiddenScreenType(value.getClass(), Minecraft.getInstance().level != null);
     }
     public static boolean hiddenScreenType(Class<?> type, boolean inWorld) {
         if (SettingsScreen.class.isAssignableFrom(type)) return false;

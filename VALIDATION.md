@@ -1,67 +1,60 @@
-# Validation — 3.0.0-beta.4+1.21.11
+# Validation — 4.0.0-alpha.3+26.3
 
-Date: 2026-10-21 (Asia/Shanghai). Environment: Windows x64, Java 21, Gradle 9.2.0, Loom 1.14.10, Yarn 1.21.11+build.4, Fabric Loader 0.18.4, Fabric API 0.141.3+1.21.11.
+Environment: Windows x64, Java 25, Gradle 9.8.0, Loom 1.19.3, Fabric Loader 0.20.1, Fabric API 0.165.0+26.3. Official unobfuscated Minecraft 26.3 client.
+
+## Meteor Sodium Compat 1
+
+- Exact target: Meteor 26.3-15, commit e3a2e77967629d216e127b5ceecf71fb15f9d2e5, with Sodium 0.9.3-beta.1+mc26.3.
+- Unpatched baseline reproduces InvalidInjectionException for the old isFluidSideExposed signature. Patched class passes real Sodium/Meteor Mixin transformation and JVM verification; the Sodium 0.9.2 fallback branch also passes.
+- Remove return-site @Local capture from the full-block fluid handler and derive the neighbor from arguments; add the new world/block-position exposure signature. A grouped selector requires a real injection on the applicable Sodium API. Xray and fluid material/alpha code retained.
+- Actual Vulkan and OpenGL full-client integrated worlds passed, with water/lava and Xray active at fluid alpha 64. Local/captured screenshots saved and clean shutdown verified.
+- Patcher verifies the original class SHA256 and verifies only one bytecode class and provenance metadata differ. Original licenses/nested dependencies preserved. Changed source embedded in JAR; full corresponding upstream source plus modifications supplied as a separate archive.
+- These results address the reported Meteor/Sodium fluid-renderer conflict. They do not establish compatibility with other Meteor builds, every addon/shader, or physical OBS capture.
+
+## alpha.3 validation
+
+- Local native presentation now uses retained-frame WM_PAINT, BeginPaint/EndPaint, GdiFlush around shared bitmap access, and geometry updates only on actual changes. Native callback failures hide the window and disable filtering.
+- Visible synthetic-window test passed: protected window DC contains green pixels; desktop capture sees the blue owner while exclusion is enabled; with exclusion temporarily disabled for synthetic pixels, green/red desktop pixels, invalidation repaint, physical resize and hide were verified. No user game pixels were exposed by this test.
+- Real DefaultFluidRenderer class transformation and JVM verification passed with official Sodium 0.9.2+mc26.3 and Meteor 26.3-15. This was the original-Meteor baseline. The separate Meteor Sodium Compat 1 patch above now supports beta.1 without disabling Xray.
+- Full client menu and temporary integrated world tested with Meteor 26.3-15, Sodium 0.9.2, Singularity 23, ImmediatelyFast 1.17.1, Fabric API 0.165.0 and Loader 0.20.1 on Intel Iris Xe / Vulkan. The test placed water/lava and saved capture/local screenshots. The marker is disabled for the world check. An OpenGL menu/world baseline with Meteor + Sodium 0.9.2 also passed before the Windows presentation changes.
+- Repeated the full Vulkan menu/world test without Sodium (Meteor + Singularity + ImmediatelyFast); it also passed with nonblack local and capture frames.
+- Full build, policy, resource ownership, Mixin, native window and real Vulkan readback tests passed.
+- A repeatable reproduction of the user's intermittent physical black screen was not established. Tests establish the repaired repaint/synchronization behavior and healthy rendered frames, not universal display or live OBS acceptance.
+
+## alpha.2 regression verification
+
+- Fixed the reported startup exception: the local renderer no longer re-registers Minecraft-owned panorama textures. The removed call replaced/closed the existing shared texture with an unloaded CubeMapTexture.
+- `TextureOwnershipTest`, included in Gradle check, rejects registration/replacement/release of Minecraft-owned textures from production overlay bytecode; its negative control detects the offending alpha.1 call.
+- `PANORAMA_OWNERSHIP_PASS` on real RenderPearl Vulkan: existing texture and view survive two local GuiRenderer creations and closures. Repeating the removed registration reproduces the exact uninitialized texture-view exception. This exercises real TextureManager, GuiRenderer and GPU resources, not a complete game/menu launch.
+- `build runSmoke -PvkSmoke -PdesktopSmoke -x downloadAssets --offline` passed, including the Vulkan readback, Mixin and queue tests.
 
 ## Passed
 
-- `build`: production JAR, sources JAR, package boundary/ownership tests.
-- `runSmoke -PglSmoke -x downloadAssets`: Fabric loaded and transformed MinecraftClient, GameRenderer, GuiRenderer, GuiRenderState, GlCommandEncoder, Screen, VideoOptionsScreen and InGameHud.
-- Real hidden GLFW/OpenGL window: MinHook swap callback executed; overlay pixels reached the local backbuffer; separate simulated capture texture was unchanged; framebuffer bindings, viewport and tested GL capabilities were restored. This test does not start OBS.
-- GUI command routing with four synthetic producer packages: all eight HUD/GUI switches remained independent; enabled HUD commands entered the overlay queue; disabled HUD commands stayed in the captured queue; MaLiLib superclass detection and in-game screen policy passed.
-- Same smoke run with Meteor Client 1.21.11-86, MaLiLib 0.27.20, Xaero's Minimap 26.6.0 (XaeroLib 1.7.3), and Xaero's World Map 1.47.0 installed in the isolated test directory.
-- Inspected production JAR: Mixin targets remapped to intermediary Minecraft names; native DLL and both licenses present; synthetic producers and smoke entrypoints absent.
+- Production `build`, including package ownership/policy tests.
+- Fabric transformations for Minecraft, GameRenderer, Gui, Hud, GuiRenderer, GuiRenderState, FrontendCommandEncoder, Screen and VideoSettingsScreen.
+- Real transformed GUI queues: hidden producer removed from capture queue; full local queue retains HUD-before-screen ordering; private map queue untouched; filter OFF; CPU-only extraction.
+- Real Meteor 26.3-15 JAR loaded in isolated `run26_3/mods`: WidgetScreen injection and private MeteorMcGuiRenderer contract checks. This is not an in-world ClickGUI recording test.
+- Real SDL3/OpenGL context: native swap hook fired; local backbuffer green; simulated capture texture red and unchanged; tested graphics state restored.
+- Real RenderPearl Vulkan device on Intel Iris Xe Graphics: separate capture/local textures, copy and clear commands, native asynchronous screenshot readback; capture red/local green verified. The Vulkan frame-delayed callback queue was advanced through real submissions.
+- Win32 software presenter: real hidden HWND, capture affinity 0x11, no-activate/click-through styles, BGRA DIB upload, stale request cancellation and shutdown.
+- RenderPearl render-pass replay and attachment-routing contracts were separately tested against the official 26.3 interfaces (including mutable command argument snapshots and unrelated attachment preservation).
 
-Final test markers:
+Reproduce:
 
 ```text
-POLICY_TEST_PASS
-MIXIN_SMOKE_PASS
-GL_SMOKE_PASS
-QUEUE_SMOKE_PASS: eight independent HUD/GUI policies, ON/OFF routing, MaLiLib superclass, extraction boundary
-BUILD SUCCESSFUL
+./gradlew build runSmoke -x downloadAssets
+./gradlew runSmoke -PglSmoke -x downloadAssets
+./gradlew runSmoke -PvkSmoke -PdesktopSmoke -x downloadAssets
 ```
 
-## Limits
+GPU/native tests require Windows x64 and supported drivers. Default CI runs only the first command. Optional Meteor checks require its matching JAR in `run26_3/mods`; it is not redistributed.
 
-The smoke process exits before the real Minecraft client/world starts. Loading third-party mixins successfully is not an end-to-end test of their live HUDs or screens. The queue policy tests use synthetic producers, not the actual HUD implementation of each mod. RusherHack was not installed or executed. Actual OBS capture ordering, private/native mod rendering, shader/renderer combinations, gameplay, resolution changes and fullscreen transitions still require manual acceptance testing.
+## Still required before a stable release
 
-This is a HUD/GUI-focused Fabric beta. It does not implement the upstream world-object filters, auto-hide feature, legacy extension API, or NeoForge build. These limits are stated in the README and release notes.
+- Live OBS game-capture acceptance on both backends, including ClickGUI, focus/mode changes and the original intermittent black-screen scenario. Full menu/local-world rendering is now tested separately.
+- Actual game-window physical presentation and cursor/click alignment under recording, mixed DPI monitors and mode changes. Synthetic visible-window repaint/resize tests are separate from live gameplay acceptance.
+- Xaero minimap normal/expanded layouts and XaeroPlus transparent world map under actual 26.3 mod versions.
+- MaLiLib-derived screens, optional Mod Menu, and RusherHack (no paid binary available for verification).
+- Profiling and review of Vulkan full-frame 30 FPS CPU readback latency and performance. Exclusive fullscreen is unsupported; capture exclusion failure disables filtering.
 
-## Beta 2: Xaero minimap target regression
-
-User report: the ordinary corner minimap became enlarged and appeared at screen center when Xaero HUD exclusion was enabled; disabling the toggle restored it.
-
-Source inspection confirmed that Xaero's `ImprovedFramebuffer.bindAsMainTarget` temporarily replaces `MinecraftClient.framebuffer` while rendering the map's scaling and rotation textures. Beta 1 incorrectly used that mutable field to identify the screen, and globally overrode the framebuffer getter during overlay drawing. Both could send intermediate map rendering to the full-size overlay.
-
-Beta 2 snapshots the screen color/depth attachments at frame start, redirects only passes targeting that captured color attachment, and leaves the game's framebuffer getter unchanged. GUI command routing is restricted to GameRenderer's screen queue, preserving private texture queues.
-
-Regression coverage: `TARGET_SMOKE_PASS` checks stable screen identity across scaling/rotation/PiP target replacements; `QUEUE_SMOKE_PASS` also checks offscreen GUI queue isolation for all four producers. These are automated regression models; the user's actual Xaero gameplay/OBS result still needs confirmation.
-
-## Beta 3: XaeroPlus transparent world map
-
-The screenshot showed map colors washed out while the world remained visible through the map background. XaeroLib's `xaerolib:pipeline/map_frame` uses RGB copy with destination-alpha preservation (ONE/ZERO, ZERO/ONE), also used by XaeroPlus transparency. The overlay starts with zero alpha, so this leaves nonzero map RGB with zero coverage. Premultiplied composition then incorrectly adds the world color to the map.
-
-The encoder now recognizes passes actually targeting the local overlay, and replaces that exact map-frame blend with premultiplied source-over. Normal screen passes, intermediate textures, map-generation pipelines and unrelated blend modes keep their original behavior. Pass transitions invalidate the cached pipeline state.
-
-Added tests: `BLEND_SMOKE_PASS` verifies the narrow blend policy; `TRANSPARENCY_GL_PASS` first reproduces the additive brightening with the old factors, then checks opaque map pixels, half-alpha edges and untouched world pixels with the correction. The hidden-window GPU test does not run the full game/OBS scene. Smoke loading additionally includes XaeroPlus 2.37.0.
-
-## Beta 4: Meteor / Meteorite ClickGUI after vanilla GUI submission
-
-The user's screenshot showed the local-only marker excluded while ClickGUI was still captured. The user's GUI filter was enabled. Source inspection of Meteor 1.21.11-86 and the installed Meteorite 1.21.11-757 confirmed that WidgetScreen.renderCustom runs from a GameRenderer injection after the initial vanilla GuiRenderer.render call, followed by another GUI submission. Earlier versions had ended their screen scope and only drained the overlay queue at the initial submission.
-
-An optional WidgetScreen.renderCustom wrapper now opens a screen extraction scope for the custom meshes and queued elements. Every submission of the actual screen GuiRenderer drains pending overlay commands, including Meteor's subsequent flush. Offscreen renderers remain isolated; overlay rendering cannot recursively drain itself. The test marker is queued at most once per frame. Meteor is still optional.
-
-Regression coverage: METEOR_MIXIN_PASS checks the real WidgetScreen transformation; LATE_GUI_SMOKE_PASS models the late extraction with the HUD filter off, checks nested visible/hidden scopes, private queue isolation and exception cleanup. Existing target, blend and hidden OpenGL pixel tests also pass with the official Meteor test setup. These checks do not establish a live OBS acceptance result.
-
-Additional compatibility run passed with the user's Meteorite build 757 (metadata: meteor-client 1.21.11-sota), Fabric Loader 0.19.5 and MixinExtras 0.5.5. METEOR_MIXIN_PASS, LATE_GUI_SMOKE_PASS and all hidden-window regression markers passed. GitHub's clean build/smoke run for code commit 22aa840 also passed without Meteor installed, verifying that the optional integration does not make Meteor a dependency.
-
-## Beta 5: local HUD below inventory and screens
-
-The previous final transparent overlay necessarily appeared above every captured screen. A depth or Z-index adjustment cannot repair ordering across those independent framebuffers. The new screen boundary submits the pending HUD before screen extraction, copies captured color into a separate full local scene, and composites the hidden HUD there. Captured color never receives that HUD. Screen submission starts with fresh depth after the HUD flush.
-
-Prepared visible GUI batches are submitted to both captured color and the local scene without preparing text, items or special elements twice. Hidden screens continue to use the separate local-only queue and are merged into the scene. Visible direct screen RenderPass commands are replayed after the captured pass closes, preserving GL's prohibition on nested render passes; offscreen textures are excluded. Menu blur runs independently on each scene, without replacing MinecraftClient.framebuffer, and screen depth clears are mirrored. The final native hook replaces the local window with the complete scene instead of blending a screen over itself. Frames without a screen retain the previous transparent overlay path.
-
-LAYER_GL_PASS exercises the production compositor and direct-pass replay with opaque, 50%-transparent and empty screen pixels: the HUD remains visible outside the screen, is occluded inside the inventory, and blends once beneath a translucent menu. It verifies clean captured pixels, deferred replay/close ordering, final replacement and a changed target size. GL_SMOKE_PASS additionally checks color-write-mask restoration. Existing map transparency, target identity, queue policy and late ClickGUI tests remain in place. These are synthetic hidden-window regressions and mixin transformations, not a live Minecraft/OBS acceptance test. Third-party postprocessing, renderers bypassing the main GUI/screen extraction path and drawing after GameRenderer still require manual validation.
-
-Both the Meteor 1.21.11-86 / Loader 0.18.4 setup and the user's Meteorite 757 / Loader 0.19.5 setup passed the build, transformed-mixin checks and hidden-window regression suite. The final Meteorite run includes the color-write-mask regression. Logs: layer-check.log and layer-meteorite-check.log in the local work directory; test mods remain outside published artifacts.
-
+No live OBS acceptance has been completed. This is an experimental development artifact, not a verified stable dual-backend release. The 1.21.11 stable release is unaffected.

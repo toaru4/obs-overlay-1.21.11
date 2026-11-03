@@ -1,60 +1,67 @@
-# OBS Overlay — Minecraft 1.21.11
+# OBS Overlay — Minecraft 26.3（实验性适配）
 
-基于 [zziger/obs-overlay](https://github.com/zziger/obs-overlay)（MIT）的 **Fabric / Windows x64 移植**。
+基于 [zziger/obs-overlay](https://github.com/zziger/obs-overlay)（MIT），面向无规则服务器使用场景的 Fabric / Windows x64 移植。当前分支为 `port/minecraft-26.3`，版本 `4.0.0-alpha.3+26.3`。
 
-让选中的 HUD、GUI 在自己屏幕上显示，同时从 OBS **游戏采集**中排除。
+选中的 HUD、GUI 仅在本地显示，目标是在 OBS 游戏采集中排除。**目前已通过构建、Mixin、真实 GPU 隔离和本地世界渲染测试，尚未完成实际 OBS 录制验收，请勿用于未经预览检查的正式直播。**
 
-## 安装和设置
+## Meteor + Sodium 0.9.3-beta.1：兼容补丁
 
-1. 安装 Minecraft **1.21.11**、Java 21、Fabric Loader **0.18.4 或更新版本**。
-2. 将本仓库 Releases 中的 `obs-overlay-fabric-*.jar` 与适用于 1.21.11 的 **Fabric API** 放入 `mods`。
-3. 打开 **选项 → 视频设置 → OBS Overlay 设置**，或者通过 Mod Menu 打开。
-4. 在「模组 HUD / 界面」页分别开启需要排除的项目。
+新增 **Meteor 26.3-15 Sodium Compat 1**：修复旧版流体方法签名和返回点局部变量捕获，支持与 Sodium **0.9.3-beta.1+mc26.3** 共存。保留 Xray、流体透明度和材质逻辑；这不是降级 Sodium 或禁用 Xray 的规避。
 
-| 模组 | HUD | GUI |
+该修复位于 Meteor 的注入类，需要用兼容补丁 JAR 替换原版 Meteor，OBS Overlay alpha.3 不需要替换。修改后的源码、严格校验原始版本的构建工具、GPLv3 许可证和安装步骤见 [compat/meteor](compat/meteor/README.md)。编译产物仅改一个类及来源元数据；原依赖和许可证保留。兼容补丁名称在 Mod Menu 中可见。
+
+已用原版 Meteor + Sodium beta.1 复现失败，并验证补丁版的类转换、JVM 校验、完整本地世界和 Xray 开启（流体 alpha=64）的水/岩浆渲染。旧 Sodium 0.9.2 分支也通过类转换回归。实际测试记录见 VALIDATION.md。
+
+## alpha.3：本地黑屏修复与 Sodium 组合
+
+- 本地窗口改用 `WM_PAINT` 保留帧重绘，补上 CPU / GDI 位图读写同步；仅在位置或尺寸改变时重设窗口，避免反复使受保护的窗口内容失效。
+- 无法重绘时隐藏本地窗口并停用过滤，设置页显示停用状态，避免留下遮住游戏的空白窗口。
+- 原版 Meteor 26.3-15 与 Sodium 0.9.2 的组合仍可用。使用 Sodium 0.9.3-beta.1 时需要上面的 Meteor 兼容补丁；原版 Meteor 仍存在 [上游已确认的注入冲突](https://github.com/MeteorDevelopment/meteor-client/issues/6737)。
+- 本轮完成真实客户端主菜单、自动创建本地世界，以及可见窗口像素/重绘/缩放测试；Vulkan 组合加入了 Singularity 23 与 ImmediatelyFast 1.17.1。实际 OBS 录制和用户报告的间歇黑屏仍需在原使用场景复测，不能仅凭测试断言所有显示问题消失。
+
+## alpha.2 热修复
+
+修复启动主菜单时 `Texture view does not exist` 崩溃：本地 GUI 渲染器复用原版全景背景纹理，不再重复注册并替换资源重载管理的纹理。替换 alpha.1 JAR 即可，配置文件保留。已用真实 Vulkan GPU 复现旧异常并验证纹理生命周期；尚未宣称完成整个整合包的启动或 OBS 验收。
+
+## 两种渲染后端
+
+| 后端 | 本地显示方式 | 当前限制 |
 | --- | --- | --- |
-| Meteor Client | 独立开关 | 独立开关 |
-| RusherHack | 独立开关 | 独立开关 |
-| Xaero 小地图 / 世界地图 | 共用 Xaero HUD 开关 | 共用 Xaero GUI 开关 |
-| MaLiLib | 独立开关 | 独立开关，识别 MaLiLib 界面基类的子类 |
+| OpenGL | SDL3 的原生 `wglSwapBuffers` 回调中合成本地画面 | OBS 游戏采集钩子顺序仍需实际验收 |
+| Vulkan | GPU 异步读回完整本地画面，由 Windows 捕获排除窗口显示 | 实验性；窗口或无边框模式；本地画面最多 30 FPS；增加 CPU/GPU 开销和显示延迟；不支持独占全屏 |
 
-开启表示「仅本地显示」；关闭表示正常录制。各模组开关默认关闭。MaLiLib GUI 包括继承其界面基类的工具模组设置页；HUD 开关处理通过 MaLiLib 绘制的内容，不代表这些模组的所有自定义渲染。
+Vulkan 窗口采用 GDI 软件绘制，没有额外的图形交换链；启用 `WDA_EXCLUDEFROMCAPTURE`、鼠标穿透和不激活窗口。失焦、最小化、尺寸不匹配或帧过期时隐藏。Windows 捕获排除失败时停用过滤；切换独占全屏期间也停用过滤。该路径需要 Windows 10 2004 或更新系统及正常的桌面合成环境。
 
-另有原版 F3、聊天记录、TAB、字幕、计分板、动作栏、标题、药水效果、主 HUD 和所有游戏内界面的开关。原版 F3 默认仅本地显示。
+## 安装与设置
 
-配置即时保存于 `config/obs_overlay-1.21.11.json`，不会覆盖旧版配置。不需要 Architectury 或 Cloth Config。Mod Menu 可选。
+1. Minecraft **26.3**、Java **25**、Fabric Loader **0.20.1 或更新版本**，以及对应版本 Fabric API。
+2. 放入 `obs-overlay-fabric-4.0.0-alpha.3+26.3.jar`。不要与 1.21.11 版同时安装。
+3. 打开 **选项 → 视频设置 → OBS Overlay 设置**；Mod Menu 可选。
+4. 分别设置 Meteor、RusherHack、Xaero、MaLiLib 的 HUD / GUI 开关。开启表示仅本地显示；关闭表示正常录制。模组开关默认关闭。
+5. OBS 使用游戏采集，关闭采集源的「采集第三方叠加层」。打开「录制测试标记」，确认本地有 `OBS LOCAL ONLY`，OBS 预览没有。
 
-## 录制检查
+保留原版 F3、聊天、TAB、字幕、计分板、动作栏、标题、药水效果、主 HUD 和所有游戏内界面的过滤选项。原版 F3 默认仅本地显示。
 
-- 使用 OBS 的「游戏采集」，关闭采集源中的「采集第三方叠加层」。显示器采集、窗口采集不适用。
-- 先启动 OBS，再启动游戏；打开「录制测试标记」。游戏中应显示 `OBS LOCAL ONLY`，OBS 画面中不应显示。
-- 分别打开模组 HUD 和设置页确认结果，切换全屏或采集方式后重新检查。录制效果取决于 OBS 与 OpenGL 钩子的安装顺序，不能仅凭设置开关断言成功。
+配置保存为 `config/obs_overlay-26.3.json`。首次使用可读取旧的 `obs_overlay-1.21.11.json`，后续修改只写入新版配置。
 
-## 移植范围与兼容性
+## 兼容范围与验证边界
 
-1.21.11 的 GUI 使用延后绘制。本版本将选中的 GUI 命令送往独立队列，在独立纹理上绘制，再通过上游同类的 Windows `wglSwapBuffers` 钩子合成本地画面。直接使用现代 Minecraft RenderPass 绘制到主目标的 HUD 也会重定向。
+- 已迁移 26.3 的 GUI 提取 / 提交分离、RenderPearl、SDL3，以及 Java 25 工具链。
+- 捕获队列排除隐藏内容；独立本地队列保留完整 HUD / 界面顺序，在对应 GUI 绘制阶段合成，避免隐藏 HUD 最后覆盖背包。
+- Meteor 26.3-15 的 WidgetScreen 和独立 GUI 渲染器已通过实际 JAR 的 Mixin / 接口检查；分别处理主 GUI 提交前后的 Meteor 绘制，保留 HUD / GUI 开关独立性。**尚未完成真实游戏内 ClickGUI 录制验收。**
+- Xaero 的私有队列和中间纹理不按屏幕纹理处理，避免误改其地图坐标空间。Xaero、XaeroPlus 透明世界地图、MaLiLib、RusherHack 的 26.3 组合尚未完成实际画面验收。
+- 不能保证排除任意模组绕过标准渲染接口绘制的内容；显示器采集与窗口采集不属于当前验收范围。
 
-正式版中，打开背包或菜单时先提交 HUD，再生成独立的完整本地画面，在 HUD 上方绘制界面。不透明的背包区域会遮住 HUD，半透明菜单则与下方 HUD 混合一次；HUD 不会因为打开界面而整体隐藏。界面的可录制部分仍正常出现在 OBS 中，被过滤部分只进入本地画面。菜单打开时需要额外的全尺寸纹理和界面绘制，可能增加显存及 GPU 开销。
+详细结果见 [VALIDATION.md](VALIDATION.md)。1.21.11 稳定版仍在 [v3.0.0-mc1.21.11](https://github.com/toaru4/obs-overlay-1.21.11/releases/tag/v3.0.0-mc1.21.11)。
 
-- **本分支专注 HUD / GUI，不是上游所有功能的等价移植。** 上游世界物体过滤（告示牌、箱子、旗帜、信标、地图、实体名字）、自动隐藏与旧版扩展 API 尚未移植；不提供 NeoForge 构建。上游原始快照保留于 `upstream-1.21.4` 分支。
-- 没有为绕开 Minecraft RenderPass / GUI 队列的私有原生 OpenGL 绘制提供兼容保证。
-- 界面层级修正覆盖原版屏幕入口、主 GUI 队列与提取阶段直接提交的屏幕 RenderPass；替换整个界面流程、在 GameRenderer 结束后绘制的外部叠加层和自定义后处理仍需单独验证。
-- RusherHack 提供包名与来源 JAR 识别，其闭源付费客户端未进行实际录制验证；修改过的加载器、混淆路径或自定义渲染器仍可能需要适配。
-- 首个正式版基于用户已确认修复的 beta.5 发布；四个模组同时运行、不同渲染器及 OBS 配置仍需按实际环境检查。
+## 构建与测试
 
-## 构建与验证
-
-```sh
-./gradlew build
-./gradlew runSmoke -x downloadAssets
-# Windows x64 上额外测试真实隐藏 OpenGL 窗口、原生钩子、像素与绘制队列：
+```text
+./gradlew build runSmoke -x downloadAssets
 ./gradlew runSmoke -PglSmoke -x downloadAssets
+./gradlew runSmoke -PvkSmoke -PdesktopSmoke -x downloadAssets
 ```
 
-`build` 执行包名边界与识别规则测试。`runSmoke` 在真正的 Fabric/Mixin 加载环境中加载所有拦截目标，并在游戏启动前退出。`-PglSmoke` 进一步验证原生合成、采集纹理不变、图形状态恢复，以及四种模拟来源的 HUD 开关隔离。测试模组和第三方模组不会打包进交付 JAR。
+后两项需要 Windows x64 与相应显卡支持。`-PvisibleSmoke` 会短暂显示一个不抢焦点的纯色窗口，验证重绘和缩放；`-PgameSmoke` 会在 `run26_3` 中启动完整客户端并创建独立测试世界，需要已下载的游戏资源，不能和 GPU 单元 smoke 标记同时使用。默认 smoke 不启动完整游戏，不应将它解释为 OBS 录制验收。第三方测试模组可放到独立的 `run26_3/mods`；不打包进发布 JAR。
 
-详见 [验证记录](VALIDATION.md)。
-
-## 授权与来源
-
-原作者 zziger，原项目 [obs-overlay](https://github.com/zziger/obs-overlay)，MIT 协议见 [LICENSE](LICENSE)。保留上游 MinHook x64 资源。此仓库为独立移植，不代表原作者或所列模组作者提供支持。
+OBS Overlay 代码遵循上游 MIT 许可证；保留原作者署名和 MinHook 许可证。compat/meteor 中的 Meteor 衍生代码单独遵循 GPL-3.0-only。
